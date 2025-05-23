@@ -3,15 +3,18 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 
-import aiohttp
 import nest_asyncio
 import uvicorn
 from fastapi import FastAPI
-from telegram.ext import Application
-from telegram.ext import ContextTypes
-from telegram.ext import ApplicationBuilder
+from telegram.ext import Application, ContextTypes
+from dotenv import load_dotenv
+from httpx import Limits
 from telegram.request import HTTPXRequest
+from telegram.ext import ApplicationBuilder
+import telegram
+print("python-telegram-bot version:", telegram.__version__)
 
 
 from config import Config
@@ -23,45 +26,28 @@ from webhook_server import setup_webhook_routes
 from handlers_common import register_handlers as register_common_handlers
 from handlers_issue import register_handlers as register_issue_handlers
 
-# Загрузка переменных окружения (если используешь dotenv)
-from dotenv import load_dotenv
-load_dotenv()
-
-# Получаем значения из переменных окружения
-TRACKER_TOKEN = os.getenv("TRACKER_TOKEN")
-TRACKER_ORG_ID = os.getenv("TRACKER_ORG_ID")
-TRACKER_QUEUE = os.getenv("TRACKER_QUEUE")
-
-# base_url трекера обычно фиксированный:
-TRACKER_BASE_URL = "https://api.tracker.yandex.net"
-
-# Инициализация TrackerAPI (без session!)
-tracker = TrackerAPI(
-    base_url=TRACKER_BASE_URL,
-    token=TRACKER_TOKEN,
-    org_id=TRACKER_ORG_ID,
-    queue=TRACKER_QUEUE
-)
-
 # ────────────────────────── конфигурация логов ────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
+# ────────────── .env ───────────────
+load_dotenv()
+
+# Получаем значения из переменных окружения
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+TRACKER_TOKEN = os.getenv("TRACKER_TOKEN")
+TRACKER_ORG_ID = os.getenv("TRACKER_ORG_ID")
+TRACKER_QUEUE = os.getenv("TRACKER_QUEUE")
+TRACKER_BASE_URL = "https://api.tracker.yandex.net"
+
 # ────────────────────────── FastAPI приложение ───────────────────────────────
-app = FastAPI()
-app = ApplicationBuilder()\
-    .token("BOT_TOKEN")\
-    .request(HTTPXRequest(
-        read_timeout=60,   # сколько ждать ответа
-        connect_timeout=30 # сколько ждать соединения
-    ))\
-    .build()
+fastapi_app = FastAPI()
 
 async def run_webhook_server(host: str, port: int) -> None:
     """Запускает FastAPI‑сервер как отдельную async‑задачу."""
-    config = uvicorn.Config(app=app, host=host, port=port, log_level="info")
+    config = uvicorn.Config(app=fastapi_app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
     await server.serve()
 
@@ -81,9 +67,16 @@ async def main() -> None:
     logging.info("🔎 Запуск бота...")
 
     # ───── создаём Telegram‑Application ─────
-    application = Application.builder().token(Config.BOT_TOKEN).build()
-    application.add_error_handler(error_handler)
+    application = ApplicationBuilder()\
+        .token(BOT_TOKEN)\
+        .request(HTTPXRequest(
+            read_timeout=60,
+            connect_timeout=30
+            # без pool_limits!
+        ))\
+        .build()
 
+    application.add_error_handler(error_handler)
 
     # ───── подключаемся к БД ─────
     db = Database()
@@ -93,36 +86,36 @@ async def main() -> None:
         return
     logging.info("✅ PostgreSQL: подключение установлено")
 
-    # ───── общая aiohttp‑сессия для TrackerAPI ─────
-    async with aiohttp.ClientSession() as session:
-        tracker = TrackerAPI(
-            base_url="https://api.tracker.yandex.net",
-            token="ТВОЙ_ТОКЕН",
-            org_id="ТВОЙ_ORG_ID",   # если используется, иначе убери этот параметр
-            queue="ТВОЯ_ОЧЕРЕДЬ"    # если используется, иначе убери этот параметр
-        )
+    # ───── инициализируем TrackerAPI ─────
+    tracker = TrackerAPI(
+        base_url=TRACKER_BASE_URL,
+        token=TRACKER_TOKEN,
+        org_id=TRACKER_ORG_ID,
+        queue=TRACKER_QUEUE
+    )
 
-        application.bot_data.update(tracker=tracker, db=db)
+    # Делаем tracker и db доступными во всех хендлерах
+    application.bot_data["tracker"] = tracker
+    application.bot_data["db"] = db
 
-        # ───── регистрируем хендлеры ─────
-        register_common_handlers(application)
-        register_issue_handlers(application)
+    # ───── регистрируем хендлеры ─────
+    register_common_handlers(application)
+    register_issue_handlers(application)
 
-        # ───── FastAPI маршруты вебхука ─────
-        setup_webhook_routes(app, application.bot, tracker)
+    # ───── FastAPI маршруты вебхука ─────
+    setup_webhook_routes(fastapi_app, application.bot, tracker)
 
-        logging.info("🤖 Бот (polling) и FastAPI‑webhook стартуют…")
+    logging.info("🤖 Бот (polling) и FastAPI‑webhook стартуют…")
 
-        # ───── параллельный запуск ─────
-        await asyncio.gather(
-            application.run_polling(),
-            run_webhook_server(args.host, args.port),
-        )
+    # ───── параллельный запуск ─────
+    await asyncio.gather(
+        application.run_polling(),
+        run_webhook_server(args.host, args.port),
+    )
 
     # закрываем ресурсы
     await db.close()
     logging.info("✅ Завершение работы: ресурсы освобождены")
-
 
 if __name__ == "__main__":
     nest_asyncio.apply()
