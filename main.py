@@ -10,6 +10,9 @@ import uvicorn
 from fastapi import FastAPI
 from telegram.ext import Application
 from telegram.ext import ContextTypes
+from telegram.ext import ApplicationBuilder
+from telegram.request import HTTPXRequest
+
 
 from config import Config
 from database import Database
@@ -28,7 +31,13 @@ logging.basicConfig(
 
 # ────────────────────────── FastAPI приложение ───────────────────────────────
 app = FastAPI()
-
+app = ApplicationBuilder()\
+    .token("BOT_TOKEN")\
+    .request(HTTPXRequest(
+        read_timeout=60,   # сколько ждать ответа
+        connect_timeout=30 # сколько ждать соединения
+    ))\
+    .build()
 
 async def run_webhook_server(host: str, port: int) -> None:
     """Запускает FastAPI‑сервер как отдельную async‑задачу."""

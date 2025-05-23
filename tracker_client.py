@@ -1,194 +1,147 @@
-import aiohttp
+import httpx
 import logging
-from config import Config
+import re
+from typing import Any, Dict, Optional, List
 
 class TrackerAPI:
-    def __init__(self, session: aiohttp.ClientSession = None):
-        self.base_url = "https://api.tracker.yandex.net/v2"
-        self.upload_url = f"{self.base_url}/attachments"
+    def __init__(self, base_url: str, token: str, org_id: Optional[str] = None, queue: Optional[str] = None):
+        self.base_url = base_url.rstrip("/")
         self.headers = {
-            "Authorization": f"Bearer {str(Config.TRACKER_TOKEN).strip()}",
-            "X-Cloud-Org-ID": str(Config.TRACKER_ORG_ID).strip()
+            "Authorization": f"OAuth {token}",
+            "Content-Type": "application/json"
         }
-        self._session = session or aiohttp.ClientSession()  # ✅ Создаём сессию, если не передана
-        self.queue = Config.TRACKER_QUEUE
+        if org_id:
+            self.headers["X-Org-Id"] = org_id
+        self.queue = queue
+        self.client = httpx.AsyncClient(timeout=30.0)
 
-    async def get_session(self):
-        """Возвращает существующую сессию или создаёт новую."""
-        if not self._session:
-            self._session = aiohttp.ClientSession()
-        return self._session
+    async def __aenter__(self):
+        return self
 
-    async def close_session(self):
-        """Закрывает сессию, если она была создана."""
-        if self._session:
-            await self._session.close()
-            self._session = None
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.client.aclose()
 
-    async def upload_file(self, file_path: str):
-        """Асинхронная загрузка одного файла в Yandex Tracker."""
-        uploaded_files = await self.upload_files([file_path])
-        return uploaded_files[0] if uploaded_files else None
-
-    async def upload_files(self, file_paths: list):
-        """Асинхронная загрузка нескольких файлов в Yandex Tracker и возврат их ID."""
-        attachment_ids = []
-        session = await self.get_session()
-
-        for file_path in file_paths:
-            try:
-                logging.info(f"📤 Загружаем файл: {file_path}")
-
-                async with session.post(
-                    self.upload_url,
-                    headers=self.headers,
-                    data={"file": open(file_path, "rb")}
-                ) as response:
-
-                    response_json = await response.json()
-                    logging.info(f"📥 Ответ API: {response.status} - {response_json}")
-
-                    if response.status != 201:
-                        logging.error(f"❌ Ошибка загрузки файла {file_path}: {response_json}")
-                        continue
-
-                    file_id = response_json.get("id")
-                    if file_id:
-                        attachment_ids.append(file_id)
-
-            except Exception as e:
-                logging.error(f"❌ Ошибка при загрузке файла {file_path}: {e}")
-
-        return attachment_ids
-
-    # Внутри TrackerAPI
-    async def get_issue_details(self, issue_keys: list[str]):
-        """Получает подробности задач по ключам."""
-        session = await self.get_session()
-        details = []
-
-        for key in issue_keys:
-            try:
-                async with session.get(
-                    f"{self.base_url}/issues/{key}",
-                    headers=self.headers
-                ) as response:
-                    response_json = await response.json()
-                    if response.status == 200:
-                        details.append(response_json)
-                    else:
-                        logging.error(f"❌ Ошибка получения задачи {key}: {response.status} - {response_json}")
-            except Exception as e:
-                logging.error(f"❌ Исключение при получении задачи {key}: {e}")
-
-        return details
-
-    async def get_active_issues_by_telegram_id(self, telegram_id: int):
-        query = {
-            "filter": {
-                "queue": self.queue,
-                "telegramId": str(telegram_id)
-            }
-        }
-
-        session = await self.get_session()  # ← добавь эту строку
-
-        try:
-            async with session.post(
-                f"{self.base_url}/issues/_search",
-                headers=self.headers,
-                json=query
-            ) as response:
-                response_json = await response.json()
-                logging.info(f"📥 Ответ API (поиск задач): {response.status} - {response_json}")
-
-                if response.status != 200:
-                    logging.error(f"❌ Ошибка поиска задач: {response_json}")
-                    return []
-
-                return response_json
-
-        except Exception as e:
-            logging.error(f"❌ Ошибка при поиске задач: {e}")
-            return []
-
-    async def create_issue(self, title: str, description: str, attachment_ids=None, telegram_id=None):
-        session = await self.get_session()
-        issue_data = {
-            "queue": Config.TRACKER_QUEUE,
-            "summary": title,
+    # 1. Создать задачу (issue)
+    async def create_issue(self, summary: str, description: str) -> Optional[Dict[str, Any]]:
+        url = f"{self.base_url}/v2/issues"
+        data = {
+            "summary": summary,
             "description": description
         }
-
-        # ✅ Добавляем telegram_id как системное поле
-        if telegram_id:
-            issue_data["telegramId"] = str(telegram_id)
-
-        if isinstance(attachment_ids, list) and attachment_ids:
-            filtered_ids = [int(fid) for fid in attachment_ids if str(fid).isdigit()]
-            if filtered_ids:
-                issue_data["attachmentIds"] = filtered_ids
-
+        if self.queue:
+            data["queue"] = self.queue
         try:
-            async with session.post(
-                f"{self.base_url}/issues",
-                headers=self.headers,
-                json=issue_data
-            ) as response:
-                response_json = await response.json()
-                logging.info(f"📥 Ответ API (создание задачи): {response.status} - {response_json}")
+            resp = await self.client.post(url, headers=self.headers, json=data)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logging.error(f"TrackerAPI: Error in create_issue: {exc}")
+        return None
 
-                if response.status != 201:
-                    logging.error(f"❌ Ошибка создания задачи: {response_json}")
-                    return None
-
-                return response_json
-        except Exception as e:
-            logging.error(f"❌ Ошибка при создании задачи: {e}")
-            return None
-
-    async def get_issue(self, issue_key: str):
-        """Получает детали задачи."""
-        session = await self.get_session()
+    # 2. Получить подробности по задачам (по ключам)
+    async def get_issue_details(self, issue_keys: List[str]) -> Optional[List[Dict[str, Any]]]:
+        url = f"{self.base_url}/v2/issues/_search"
+        data = {
+            "filter": {
+                "key": issue_keys
+            },
+            "expand": ["description", "attachments"]
+        }
         try:
-            async with session.get(
-                f"{self.base_url}/issues/{issue_key}",
-                headers=self.headers
-            ) as response:
+            resp = await self.client.post(url, headers=self.headers, json=data)
+            resp.raise_for_status()
+            return resp.json().get("issues", [])
+        except Exception as exc:
+            logging.error(f"TrackerAPI: Error in get_issue_details: {exc}")
+        return None
 
-                response_json = await response.json()
-                if response.status != 200:
-                    logging.error(f"❌ Ошибка получения данных о задаче {issue_key}: {response_json}")
-                    return None
-
-                return response_json
-
-        except Exception as e:
-            logging.error(f"❌ Ошибка при запросе задачи {issue_key}: {e}")
-            return None
-
-    async def add_comment(self, issue_key: str, comment_text: str, attachment_ids=None):
-        """Добавляет комментарий в задачу."""
-        session = await self.get_session()
-        comment_data = {"text": comment_text}
-
-        if attachment_ids:
-            comment_data["attachments"] = [{"id": file_id} for file_id in attachment_ids]
-
+    # 3. Получить комментарии с вложениями к задаче
+    async def get_issue_comments(self, issue_key: str, expand_attachments: bool = True) -> Optional[List[Dict[str, Any]]]:
+        url = f"{self.base_url}/v2/issues/{issue_key}/comments"
+        params = {"expand": "attachments"} if expand_attachments else None
         try:
-            async with session.post(
-                f"{self.base_url}/issues/{issue_key}/comments",
-                headers=self.headers,
-                json=comment_data
-            ) as response:
+            resp = await self.client.get(url, headers=self.headers, params=params)
+            resp.raise_for_status()
+            return resp.json().get("comments", [])
+        except Exception as exc:
+            logging.error(f"TrackerAPI: Error in get_issue_comments: {exc}")
+        return None
 
-                response_json = await response.json()
-                if response.status != 201:
-                    logging.error(f"❌ Ошибка при добавлении комментария: {response_json}")
-                    return None
+    # 4. Получить информацию о вложении (file info by self-link)
+    async def get_attachment_info(self, self_url: str) -> Optional[Dict[str, Any]]:
+        try:
+            resp = await self.client.get(self_url, headers=self.headers)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logging.error(f"TrackerAPI: Error in get_attachment_info: {exc}")
+        return None
 
-                return response_json
+    # 5. Загрузить файл и получить его id
+    async def upload_file(self, file_path: str) -> Optional[str]:
+        url = f"{self.base_url}/v2/attachments"
+        try:
+            with open(file_path, "rb") as f:
+                files = {'file': (file_path, f)}
+                resp = await self.client.post(url, headers={"Authorization": self.headers["Authorization"]}, files=files)
+                resp.raise_for_status()
+                result = resp.json()
+                return result.get("id")
+        except Exception as exc:
+            logging.error(f"TrackerAPI: Error in upload_file: {exc}")
+        return None
 
-        except Exception as e:
-            logging.error(f"❌ Ошибка при добавлении комментария к задаче {issue_key}: {e}")
-            return None
+    # 6. Добавить комментарий к задаче
+    async def add_comment(self, issue_key: str, comment: str) -> bool:
+        url = f"{self.base_url}/v2/issues/{issue_key}/comments"
+        data = {"text": comment}
+        try:
+            resp = await self.client.post(url, headers=self.headers, json=data)
+            resp.raise_for_status()
+            return True
+        except Exception as exc:
+            logging.error(f"TrackerAPI: Error in add_comment: {exc}")
+        return False
+
+    # 7. Добавить комментарий с вложением к задаче
+    async def add_attachment_comment(self, issue_key: str, file_id: str, text: str = "Файл прикреплен.") -> bool:
+        url = f"{self.base_url}/v2/issues/{issue_key}/comments"
+        data = {
+            "attachments": [file_id],
+            "text": text
+        }
+        try:
+            resp = await self.client.post(url, headers=self.headers, json=data)
+            resp.raise_for_status()
+            return True
+        except Exception as exc:
+            logging.error(f"TrackerAPI: Error in add_attachment_comment: {exc}")
+        return False
+
+    # 8. Извлечь ключ задачи из текста
+    @staticmethod
+    def extract_issue_key(text: str) -> Optional[str]:
+        match = re.search(r"\b([A-Z]+-\d+)\b", text)
+        return match.group(1) if match else None
+
+    # 9. Получить список задач с фильтром по очереди (queue)
+    async def get_issues_by_queue(self, queue: str, limit: int = 20) -> Optional[List[Dict[str, Any]]]:
+        url = f"{self.base_url}/v2/issues/_search"
+        data = {
+            "filter": {
+                "queue": queue
+            },
+            "orderBy": "-createdAt",
+            "pageSize": limit
+        }
+        try:
+            resp = await self.client.post(url, headers=self.headers, json=data)
+            resp.raise_for_status()
+            return resp.json().get("issues", [])
+        except Exception as exc:
+            logging.error(f"TrackerAPI: Error in get_issues_by_queue: {exc}")
+        return None
+
+    # 10. Закрытие клиента вручную (если не используешь контекст)
+    async def close(self):
+        await self.client.aclose()
