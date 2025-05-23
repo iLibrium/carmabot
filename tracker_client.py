@@ -1,152 +1,180 @@
-import httpx
 import logging
-import re
-from typing import Any, Dict, Optional, List
+import aiohttp
+
+logger = logging.getLogger(__name__)
 
 class TrackerAPI:
-    def __init__(
-        self,
-        base_url: str,
-        token: str,
-        org_id: Optional[str] = None,
-        queue: Optional[str] = None
-    ):
-        self.base_url = base_url.rstrip("/")
-        self.headers = {
-            "Authorization": f"OAuth {token}",
+    def __init__(self, base_url, token, org_id=None, queue=None):
+        self.base_url = base_url.rstrip('/')
+        self.token = token
+        self.org_id = org_id
+        self.queue = queue
+        self._session = None
+
+    async def get_session(self):
+        # Позволяет переиспользовать одну сессию во всем приложении (рекомендуется)
+        if self._session is None or self._session.closed:
+            timeout = aiohttp.ClientTimeout(total=60)
+            self._session = aiohttp.ClientSession(timeout=timeout)
+        return self._session
+
+    async def close(self):
+        if self._session and not self._session.closed:
+            await self._session.close()
+
+    def _get_headers(self):
+        headers = {
+            "Authorization": f"OAuth {self.token}",
             "Content-Type": "application/json",
         }
-        if org_id:
-            self.headers["X-Org-Id"] = org_id
-        self.queue = queue
-        self.client = httpx.AsyncClient(timeout=30.0)
+        if self.org_id:
+            headers["X-Org-Id"] = self.org_id
+        return headers
+
+    async def create_issue(self, title, description, extra_fields=None):
+        """
+        Создание задачи в трекере.
+        """
+        url = f"{self.base_url}/v2/issues/"
+        data = {
+            "summary": title,
+            "description": description,
+        }
+        if self.queue:
+            data["queue"] = self.queue
+        if extra_fields:
+            data.update(extra_fields)
+
+        session = await self.get_session()
+        headers = self._get_headers()
+
+        async with session.post(url, json=data, headers=headers) as resp:
+            if resp.status != 201:
+                text = await resp.text()
+                logger.error(f"Failed to create issue: {resp.status} {text}")
+                raise Exception(f"Create issue failed: {resp.status} {text}")
+            return await resp.json()
+
+    async def get_issue_details(self, issue_key):
+        """
+        Получить детали задачи по её ключу.
+        """
+        url = f"{self.base_url}/v2/issues/{issue_key}"
+        session = await self.get_session()
+        headers = self._get_headers()
+        async with session.get(url, headers=headers) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(f"Failed to get issue details: {resp.status} {text}")
+                raise Exception(f"Get issue failed: {resp.status} {text}")
+            return await resp.json()
+
+    async def get_active_issues_by_telegram_id(self, telegram_id: int):
+        """
+        Вернуть активные задачи для указанного Telegram ID.
+        """
+        url = f"{self.base_url}/v2/issues/_search"
+        query = {
+            "filter": {
+                "queue": self.queue,
+                "telegramId": str(telegram_id)
+            }
+        }
+        session = await self.get_session()
+        headers = self._get_headers()
+        async with session.post(url, json=query, headers=headers) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(f"Failed to search issues: {resp.status} {text}")
+                raise Exception(f"Search issues failed: {resp.status} {text}")
+            return await resp.json()
+
+    async def add_comment(self, issue_key, comment):
+        """
+        Добавить комментарий к задаче.
+        """
+        url = f"{self.base_url}/v2/issues/{issue_key}/comments"
+        data = {"text": comment}
+        session = await self.get_session()
+        headers = self._get_headers()
+        async with session.post(url, json=data, headers=headers) as resp:
+            if resp.status != 201:
+                text = await resp.text()
+                logger.error(f"Failed to add comment: {resp.status} {text}")
+                raise Exception(f"Add comment failed: {resp.status} {text}")
+            return await resp.json()
+
+    async def upload_file(self, file_path):
+        """
+        Загрузить файл и получить его fileId для дальнейших вложений.
+        """
+        url = f"{self.base_url}/v2/files"
+        session = await self.get_session()
+        headers = self._get_headers()
+        with open(file_path, "rb") as f:
+            data = f.read()
+        upload_headers = headers.copy()
+        upload_headers["Content-Type"] = "application/octet-stream"
+        async with session.post(url, data=data, headers=upload_headers) as resp:
+            if resp.status != 201:
+                text = await resp.text()
+                logger.error(f"Failed to upload file: {resp.status} {text}")
+                raise Exception(f"Upload file failed: {resp.status} {text}")
+            return await resp.json()
+
+    async def add_attachment_comment(self, issue_key, file_id):
+        """
+        Добавить комментарий с вложением к задаче.
+        """
+        url = f"{self.base_url}/v2/issues/{issue_key}/comments"
+        data = {
+            "text": "Вложение",
+            "attachments": [file_id]
+        }
+        session = await self.get_session()
+        headers = self._get_headers()
+        async with session.post(url, json=data, headers=headers) as resp:
+            if resp.status != 201:
+                text = await resp.text()
+                logger.error(f"Failed to add attachment comment: {resp.status} {text}")
+                raise Exception(f"Add attachment comment failed: {resp.status} {text}")
+            return await resp.json()
+
+    async def get_issue_comments(self, issue_key, expand_attachments=False):
+        """
+        Получить комментарии к задаче (с расширением для вложений).
+        """
+        url = f"{self.base_url}/v2/issues/{issue_key}/comments"
+        if expand_attachments:
+            url += "?expand=attachments"
+        session = await self.get_session()
+        headers = self._get_headers()
+        async with session.get(url, headers=headers) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(f"Failed to get comments: {resp.status} {text}")
+                raise Exception(f"Get comments failed: {resp.status} {text}")
+            return await resp.json()
+
+    async def get_file_content(self, file_self_url):
+        """
+        Получить содержимое файла по self-ссылке.
+        """
+        session = await self.get_session()
+        headers = self._get_headers()
+        async with session.get(file_self_url, headers=headers) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(f"Failed to get file content: {resp.status} {text}")
+                raise Exception(f"Get file content failed: {resp.status} {text}")
+            return await resp.read()
+
+    # Если нужно очистить сессию на выходе
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
 
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
-        await self.client.aclose()
-
-    async def close(self):
-        await self.client.aclose()
-
-    # 1. Создать задачу (issue)
-    async def create_issue(self, summary: str, description: str) -> Optional[Dict[str, Any]]:
-        url = f"{self.base_url}/v2/issues"
-        data = {
-            "summary": summary,
-            "description": description
-        }
-        if self.queue:
-            data["queue"] = self.queue
-        try:
-            resp = await self.client.post(url, headers=self.headers, json=data)
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as exc:
-            logging.error(f"TrackerAPI: Error in create_issue: {exc}")
-        return None
-
-    # 2. Получить подробности задач (по ключам)
-    async def get_issue_details(self, issue_keys: List[str]) -> Optional[List[Dict[str, Any]]]:
-        url = f"{self.base_url}/v2/issues/_search"
-        data = {
-            "filter": {
-                "key": issue_keys
-            },
-            "expand": ["description", "attachments"]
-        }
-        try:
-            resp = await self.client.post(url, headers=self.headers, json=data)
-            resp.raise_for_status()
-            return resp.json().get("issues", [])
-        except Exception as exc:
-            logging.error(f"TrackerAPI: Error in get_issue_details: {exc}")
-        return None
-
-    # 3. Получить комментарии к задаче (с вложениями)
-    async def get_issue_comments(self, issue_key: str, expand_attachments: bool = True) -> Optional[List[Dict[str, Any]]]:
-        url = f"{self.base_url}/v2/issues/{issue_key}/comments"
-        params = {"expand": "attachments"} if expand_attachments else None
-        try:
-            resp = await self.client.get(url, headers=self.headers, params=params)
-            resp.raise_for_status()
-            return resp.json().get("comments", [])
-        except Exception as exc:
-            logging.error(f"TrackerAPI: Error in get_issue_comments: {exc}")
-        return None
-
-    # 4. Получить информацию о вложении (по self url)
-    async def get_attachment_info(self, self_url: str) -> Optional[Dict[str, Any]]:
-        try:
-            resp = await self.client.get(self_url, headers=self.headers)
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as exc:
-            logging.error(f"TrackerAPI: Error in get_attachment_info: {exc}")
-        return None
-
-    # 5. Загрузить файл и получить его id
-    async def upload_file(self, file_path: str) -> Optional[str]:
-        url = f"{self.base_url}/v2/attachments"
-        try:
-            with open(file_path, "rb") as f:
-                files = {'file': (file_path, f)}
-                resp = await self.client.post(url, headers={"Authorization": self.headers["Authorization"]}, files=files)
-                resp.raise_for_status()
-                result = resp.json()
-                return result.get("id")
-        except Exception as exc:
-            logging.error(f"TrackerAPI: Error in upload_file: {exc}")
-        return None
-
-    # 6. Добавить текстовый комментарий к задаче
-    async def add_comment(self, issue_key: str, comment: str) -> bool:
-        url = f"{self.base_url}/v2/issues/{issue_key}/comments"
-        data = {"text": comment}
-        try:
-            resp = await self.client.post(url, headers=self.headers, json=data)
-            resp.raise_for_status()
-            return True
-        except Exception as exc:
-            logging.error(f"TrackerAPI: Error in add_comment: {exc}")
-        return False
-
-    # 7. Добавить комментарий с вложением к задаче
-    async def add_attachment_comment(self, issue_key: str, file_id: str, text: str = "Файл прикреплен.") -> bool:
-        url = f"{self.base_url}/v2/issues/{issue_key}/comments"
-        data = {
-            "attachments": [file_id],
-            "text": text
-        }
-        try:
-            resp = await self.client.post(url, headers=self.headers, json=data)
-            resp.raise_for_status()
-            return True
-        except Exception as exc:
-            logging.error(f"TrackerAPI: Error in add_attachment_comment: {exc}")
-        return False
-
-    # 8. Извлечь ключ задачи из текста
-    @staticmethod
-    def extract_issue_key(text: str) -> Optional[str]:
-        match = re.search(r"\b([A-Z]+-\d+)\b", text)
-        return match.group(1) if match else None
-
-    # 9. Получить задачи по очереди
-    async def get_issues_by_queue(self, queue: str, limit: int = 20) -> Optional[List[Dict[str, Any]]]:
-        url = f"{self.base_url}/v2/issues/_search"
-        data = {
-            "filter": {
-                "queue": queue
-            },
-            "orderBy": "-createdAt",
-            "pageSize": limit
-        }
-        try:
-            resp = await self.client.post(url, headers=self.headers, json=data)
-            resp.raise_for_status()
-            return resp.json().get("issues", [])
-        except Exception as exc:
-            logging.error(f"TrackerAPI: Error in get_issues_by_queue: {exc}")
-        return None
+# Для совместимости с "async with TrackerAPI(...) as tracker:"
+# Не забудь закрывать сессию в конце работы (или при завершении приложения)!

@@ -24,6 +24,7 @@ from telegram.ext import (
     filters,
 )
 
+from send_monitor import safe_send_message, safe_reply_text
 from database import Database
 from tracker_client import TrackerAPI
 from states import IssueStates
@@ -189,7 +190,7 @@ async def _process_album_later(group_id: str, context: CallbackContext):
                 attachments.append(file_id)
         except Exception as exc:
             logging.exception("Ошибка загрузки из альбома: %s", exc)
-            await context.bot.send_message(chat_id, "❌ Не удалось загрузить одно из фото. Отправьте альбом снова.")
+            await safe_send_message(context.bot, chat_id=chat_id, text="❌ Не удалось загрузить одно из фото. Отправьте альбом снова.")
             return  # прерываем весь альбом
 
     # складываем ID вложений в user_data
