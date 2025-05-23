@@ -23,6 +23,26 @@ from webhook_server import setup_webhook_routes
 from handlers_common import register_handlers as register_common_handlers
 from handlers_issue import register_handlers as register_issue_handlers
 
+# Загрузка переменных окружения (если используешь dotenv)
+from dotenv import load_dotenv
+load_dotenv()
+
+# Получаем значения из переменных окружения
+TRACKER_TOKEN = os.getenv("TRACKER_TOKEN")
+TRACKER_ORG_ID = os.getenv("TRACKER_ORG_ID")
+TRACKER_QUEUE = os.getenv("TRACKER_QUEUE")
+
+# base_url трекера обычно фиксированный:
+TRACKER_BASE_URL = "https://api.tracker.yandex.net"
+
+# Инициализация TrackerAPI (без session!)
+tracker = TrackerAPI(
+    base_url=TRACKER_BASE_URL,
+    token=TRACKER_TOKEN,
+    org_id=TRACKER_ORG_ID,
+    queue=TRACKER_QUEUE
+)
+
 # ────────────────────────── конфигурация логов ────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -75,7 +95,12 @@ async def main() -> None:
 
     # ───── общая aiohttp‑сессия для TrackerAPI ─────
     async with aiohttp.ClientSession() as session:
-        tracker = TrackerAPI(session=session)
+        tracker = TrackerAPI(
+            base_url="https://api.tracker.yandex.net",
+            token="ТВОЙ_ТОКЕН",
+            org_id="ТВОЙ_ORG_ID",   # если используется, иначе убери этот параметр
+            queue="ТВОЯ_ОЧЕРЕДЬ"    # если используется, иначе убери этот параметр
+        )
 
         application.bot_data.update(tracker=tracker, db=db)
 

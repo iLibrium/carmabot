@@ -4,11 +4,17 @@ import re
 from typing import Any, Dict, Optional, List
 
 class TrackerAPI:
-    def __init__(self, base_url: str, token: str, org_id: Optional[str] = None, queue: Optional[str] = None):
+    def __init__(
+        self,
+        base_url: str,
+        token: str,
+        org_id: Optional[str] = None,
+        queue: Optional[str] = None
+    ):
         self.base_url = base_url.rstrip("/")
         self.headers = {
             "Authorization": f"OAuth {token}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
         if org_id:
             self.headers["X-Org-Id"] = org_id
@@ -19,6 +25,9 @@ class TrackerAPI:
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
+        await self.client.aclose()
+
+    async def close(self):
         await self.client.aclose()
 
     # 1. Создать задачу (issue)
@@ -38,7 +47,7 @@ class TrackerAPI:
             logging.error(f"TrackerAPI: Error in create_issue: {exc}")
         return None
 
-    # 2. Получить подробности по задачам (по ключам)
+    # 2. Получить подробности задач (по ключам)
     async def get_issue_details(self, issue_keys: List[str]) -> Optional[List[Dict[str, Any]]]:
         url = f"{self.base_url}/v2/issues/_search"
         data = {
@@ -55,7 +64,7 @@ class TrackerAPI:
             logging.error(f"TrackerAPI: Error in get_issue_details: {exc}")
         return None
 
-    # 3. Получить комментарии с вложениями к задаче
+    # 3. Получить комментарии к задаче (с вложениями)
     async def get_issue_comments(self, issue_key: str, expand_attachments: bool = True) -> Optional[List[Dict[str, Any]]]:
         url = f"{self.base_url}/v2/issues/{issue_key}/comments"
         params = {"expand": "attachments"} if expand_attachments else None
@@ -67,7 +76,7 @@ class TrackerAPI:
             logging.error(f"TrackerAPI: Error in get_issue_comments: {exc}")
         return None
 
-    # 4. Получить информацию о вложении (file info by self-link)
+    # 4. Получить информацию о вложении (по self url)
     async def get_attachment_info(self, self_url: str) -> Optional[Dict[str, Any]]:
         try:
             resp = await self.client.get(self_url, headers=self.headers)
@@ -91,7 +100,7 @@ class TrackerAPI:
             logging.error(f"TrackerAPI: Error in upload_file: {exc}")
         return None
 
-    # 6. Добавить комментарий к задаче
+    # 6. Добавить текстовый комментарий к задаче
     async def add_comment(self, issue_key: str, comment: str) -> bool:
         url = f"{self.base_url}/v2/issues/{issue_key}/comments"
         data = {"text": comment}
@@ -124,7 +133,7 @@ class TrackerAPI:
         match = re.search(r"\b([A-Z]+-\d+)\b", text)
         return match.group(1) if match else None
 
-    # 9. Получить список задач с фильтром по очереди (queue)
+    # 9. Получить задачи по очереди
     async def get_issues_by_queue(self, queue: str, limit: int = 20) -> Optional[List[Dict[str, Any]]]:
         url = f"{self.base_url}/v2/issues/_search"
         data = {
@@ -141,7 +150,3 @@ class TrackerAPI:
         except Exception as exc:
             logging.error(f"TrackerAPI: Error in get_issues_by_queue: {exc}")
         return None
-
-    # 10. Закрытие клиента вручную (если не используешь контекст)
-    async def close(self):
-        await self.client.aclose()
