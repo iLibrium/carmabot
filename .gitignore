@@ -6,3 +6,4 @@ __pycache__/
 /trash/
 *.log
 .gitignore
+git.txt
