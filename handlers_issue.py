@@ -246,7 +246,10 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
         f"🔗 @{user.username or 'без username'}"
     )
 
-    issue = await tracker.create_issue(title, full_description, attachments, telegram_id=user.id)
+    extra_fields = {"telegramId": str(user.id)}
+    if attachments:
+        extra_fields["attachments"] = attachments
+    issue = await tracker.create_issue(title, full_description, extra_fields)
     if issue and "key" in issue:
         await db.create_issue(user.id, issue["key"])
         await query.message.reply_text(
