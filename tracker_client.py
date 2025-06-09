@@ -1,4 +1,5 @@
 import logging
+import os
 import aiohttp
 
 logger = logging.getLogger(__name__)
@@ -96,14 +97,16 @@ class TrackerAPI:
         url = f"{self.base_url}/v2/attachments"
         session = await self.get_session()
         headers = self._get_headers()
+        
+        form = aiohttp.FormData()
+        form.add_field(
+            "file",
+            open(file_path, "rb"),
+            filename=os.path.basename(file_path),
+            content_type="application/octet-stream",
+        )
 
-        with open(file_path, "rb") as f:
-            data = f.read()
-
-        upload_headers = headers.copy()
-        upload_headers["Content-Type"] = "application/octet-stream"
-
-        async with session.post(url, data=data, headers=upload_headers) as resp:
+        async with session.post(url, data=form, headers=headers) as resp:
             if resp.status != 201:
                 text = await resp.text()
                 logger.error(f"Failed to upload file: {resp.status} {text}")
