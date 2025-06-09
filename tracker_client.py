@@ -12,7 +12,6 @@ class TrackerAPI:
         self._session = None
 
     async def get_session(self):
-        # Позволяет переиспользовать одну сессию во всем приложении (рекомендуется)
         if self._session is None or self._session.closed:
             timeout = aiohttp.ClientTimeout(total=60)
             self._session = aiohttp.ClientSession(timeout=timeout)
@@ -32,9 +31,6 @@ class TrackerAPI:
         return headers
 
     async def create_issue(self, title, description, extra_fields=None):
-        """
-        Создание задачи в трекере.
-        """
         url = f"{self.base_url}/v2/issues/"
         data = {
             "summary": title,
@@ -44,10 +40,8 @@ class TrackerAPI:
             data["queue"] = self.queue
         if extra_fields:
             data.update(extra_fields)
-
         session = await self.get_session()
         headers = self._get_headers()
-
         async with session.post(url, json=data, headers=headers) as resp:
             if resp.status != 201:
                 text = await resp.text()
@@ -56,9 +50,6 @@ class TrackerAPI:
             return await resp.json()
 
     async def get_issue_details(self, issue_key):
-        """
-        Получить детали задачи по её ключу.
-        """
         url = f"{self.base_url}/v2/issues/{issue_key}"
         session = await self.get_session()
         headers = self._get_headers()
@@ -70,9 +61,6 @@ class TrackerAPI:
             return await resp.json()
 
     async def get_active_issues_by_telegram_id(self, telegram_id: int):
-        """
-        Вернуть активные задачи для указанного Telegram ID.
-        """
         url = f"{self.base_url}/v2/issues/_search"
         query = {
             "filter": {
@@ -90,9 +78,6 @@ class TrackerAPI:
             return await resp.json()
 
     async def add_comment(self, issue_key, comment):
-        """
-        Добавить комментарий к задаче.
-        """
         url = f"{self.base_url}/v2/issues/{issue_key}/comments"
         data = {"text": comment}
         session = await self.get_session()
@@ -105,9 +90,6 @@ class TrackerAPI:
             return await resp.json()
 
     async def upload_file(self, file_path):
-        """
-        Загрузить файл и получить его fileId для дальнейших вложений.
-        """
         url = f"{self.base_url}/v2/files"
         session = await self.get_session()
         headers = self._get_headers()
@@ -123,9 +105,6 @@ class TrackerAPI:
             return await resp.json()
 
     async def add_attachment_comment(self, issue_key, file_id):
-        """
-        Добавить комментарий с вложением к задаче.
-        """
         url = f"{self.base_url}/v2/issues/{issue_key}/comments"
         data = {
             "text": "Вложение",
@@ -141,9 +120,6 @@ class TrackerAPI:
             return await resp.json()
 
     async def get_issue_comments(self, issue_key, expand_attachments=False):
-        """
-        Получить комментарии к задаче (с расширением для вложений).
-        """
         url = f"{self.base_url}/v2/issues/{issue_key}/comments"
         if expand_attachments:
             url += "?expand=attachments"
@@ -157,9 +133,6 @@ class TrackerAPI:
             return await resp.json()
 
     async def get_file_content(self, file_self_url):
-        """
-        Получить содержимое файла по self-ссылке.
-        """
         session = await self.get_session()
         headers = self._get_headers()
         async with session.get(file_self_url, headers=headers) as resp:
@@ -169,12 +142,10 @@ class TrackerAPI:
                 raise Exception(f"Get file content failed: {resp.status} {text}")
             return await resp.read()
 
-    # Если нужно очистить сессию на выходе
-    async def __aexit__(self, exc_type, exc, tb):
-        await self.close()
-
     async def __aenter__(self):
         return self
 
-# Для совместимости с "async with TrackerAPI(...) as tracker:"
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
+
 # Не забудь закрывать сессию в конце работы (или при завершении приложения)!

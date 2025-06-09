@@ -3,8 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from telegram import Update, Message
+from telegram.ext import ContextTypes
 from telegram.ext import CallbackContext, ConversationHandler
-
+from send_monitor import safe_send_message, safe_reply_text
+from telegram.ext import (
+    CommandHandler, MessageHandler, CallbackQueryHandler, ConversationHandler, filters
+)
+from states import RegistrationStates
 
 from database import Database
 from keyboards import (
@@ -14,50 +19,32 @@ from keyboards import (
 )
 from states import RegistrationStates
 
-# ──────────────────────── вспомогательные функции ─────────────────────────
-async def _show_reply_menu(message: Message):
-    """Отправляет reply‑клавиатуру отдельным сообщением."""
-    await message.reply_text("🔄 Выберите действие:", reply_markup=main_reply_keyboard())
 
-
-async def _show_inline_menu(message: Message, *, edit: bool = False):
-    """Показывает inline‑меню (редактируя существующее сообщение или отправляя новое).
-
-    Args:
-        message: исходное сообщение (для reply или callback).
-        edit: если True — редактирует *message*, иначе отправляет новое.
-    """
-    if edit:
-        await message.edit_text("🔄 Выберите действие:", reply_markup=main_inline_keyboard())
-    else:
-        await message.reply_text("🔄 Выберите действие:", reply_markup=main_inline_keyboard())
-
+# Универсальная функция для вывода только inline-меню
+async def show_main_inline_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(
+            "Главное меню:",
+            reply_markup=main_inline_keyboard()
+        )
+    elif update.message:
+        await update.message.reply_text(
+            "Главное меню:",
+            reply_markup=main_inline_keyboard()
+        )
 
 # ────────────────────────── /start  ─────────────────────────────
-async def start(update: Update, context: CallbackContext):
-    """Команда /start.
-    • Если пользователь уже известен — сразу показывает меню.
-    • Иначе просит контакт для регистрации.
-    """
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    db: Database = context.bot_data["db"]
-
+    db = context.bot_data["db"]
     user_info = await db.get_user(user_id)
     if user_info:
-        # Отправляем оба меню параллельно и завершаем.
-        await asyncio.gather(
-            _show_inline_menu(update.message, edit=False),
-            _show_reply_menu(update.message),
-        )
+        await show_main_inline_menu(update, context)
         return ConversationHandler.END
-
-    # Новый пользователь — просим контакт.
-    await update.message.reply_text(
-        "📲 Отправьте ваш контакт для регистрации.",
-        reply_markup=contact_keyboard(),
-    )
-    return RegistrationStates.waiting_for_contact
-
+    # ... логика регистрации ...
+    # После успешной регистрации тоже вызвать:
+    # await show_main_inline_menu(update, context)
 
 async def show_user_info(update, context):
     db = context.bot_data["db"]
@@ -93,37 +80,30 @@ async def process_contact(update: Update, context: CallbackContext):
     )
 
     # После регистрации показываем оба меню.
-    await asyncio.gather(
-        _show_inline_menu(update.message, edit=False),
-        _show_reply_menu(update.message),
-    )
+    await main_menu(update, context)
     return ConversationHandler.END
 
 
 # ──────────────────────── главное меню (универсальное) ────────────────────
-async def main_menu(update: Update, context: CallbackContext):
-    """Выводит оба меню для сообщения или callback‑запроса."""
+async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Главный вход во все ситуации: всегда только inline-меню, без reply
+    """
     if update.callback_query:
-        # Редактируем сообщение с inline‑кнопкой + отправляем reply‑меню
-        await asyncio.gather(
-            _show_inline_menu(update.callback_query.message, edit=True),
-            _show_reply_menu(update.callback_query.message),
-        )
         await update.callback_query.answer()
+        await update.callback_query.edit_message_text(
+            "Главное меню:",
+            reply_markup=main_inline_keyboard()
+        )
     elif update.message:
-        # От обычного текста/команды — два новых сообщения
-        await asyncio.gather(
-            _show_inline_menu(update.message, edit=False),
-            _show_reply_menu(update.message),
+        await update.message.reply_text(
+            "Главное меню:",
+            reply_markup=main_inline_keyboard()
         )
 
 def register_handlers(application):
-    from telegram.ext import CommandHandler, MessageHandler, filters, ConversationHandler
-
     registration_conv = ConversationHandler(
-        entry_points=[
-            CommandHandler("start", start),
-        ],
+        entry_points=[CommandHandler("start", start)],
         states={
             RegistrationStates.waiting_for_contact: [
                 MessageHandler(filters.CONTACT, process_contact),
@@ -134,7 +114,10 @@ def register_handlers(application):
     )
     application.add_handler(registration_conv)
 
-    # Остальные message/callback хендлеры
+    # --- INLINE-КНОПКИ ---
+    application.add_handler(CallbackQueryHandler(main_menu, pattern="^main_menu$"))
+    application.add_handler(CallbackQueryHandler(show_user_info, pattern="^user_info$"))
+
+    # --- (ОСТАЛЬНОЕ ОСТАВИТЬ для совместимости) ---
     application.add_handler(MessageHandler(filters.Regex("^🔄 Главное меню$"), main_menu))
     application.add_handler(MessageHandler(filters.Regex("^👤 Моя информация$"), show_user_info))
-    # и другие message/callback хендлеры по необходимости

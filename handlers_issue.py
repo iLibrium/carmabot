@@ -5,6 +5,7 @@ import logging
 import os
 from collections import defaultdict
 from typing import Final, List, Dict
+from telegram.ext import ContextTypes
 
 from telegram import (
     Update,
@@ -16,13 +17,10 @@ from telegram import (
 )
 from telegram.error import TelegramError
 from telegram.ext import (
-    Application,
-    CallbackContext,
-    ConversationHandler,
-    CallbackQueryHandler,
-    MessageHandler,
-    filters,
+    MessageHandler, CallbackQueryHandler, ConversationHandler, filters
 )
+from states import IssueStates
+from states import IssueStates
 
 from send_monitor import safe_send_message, safe_reply_text
 from database import Database
@@ -39,46 +37,68 @@ _album_buffer: Dict[str, List[Message]] = defaultdict(list)  # media_group_id ->
 
 # ═══════════════════════════ список задач ═════════════════════════════════════
 
-async def my_issues(update: Update, context: CallbackContext) -> None:
-    """Отправляет пользователю клавиатуру с его активными задачами."""
+async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Отправляет пользователю клавиатуру с его активными задачами (универсально: inline-кнопка или текстовая команда)."""
     telegram_id = update.effective_user.id
     tracker: TrackerAPI = context.bot_data["tracker"]
 
     issues = await tracker.get_active_issues_by_telegram_id(telegram_id)
-    if not issues:
-        await update.message.reply_text("📭 У вас нет активных задач.")
-        return
-
-    keyboard: List[List[InlineKeyboardButton]] = [
+    keyboard = [
         [InlineKeyboardButton(f"{issue.get('key')}: {issue.get('summary', 'Без описания')}",
-                               callback_data=f"issue_{issue['key']}")]
+                              callback_data=f"issue_{issue['key']}")]
         for issue in issues
     ]
     keyboard.append([InlineKeyboardButton("🔄 Главное меню", callback_data="main_menu")])
+    markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text("📂 Ваши открытые задачи:", reply_markup=InlineKeyboardMarkup(keyboard))
+    if not issues:
+        if update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.edit_message_text("📭 У вас нет активных задач.", reply_markup=markup)
+        elif update.message:
+            await update.message.reply_text("📭 У вас нет активных задач.", reply_markup=markup)
+        return
+
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text("📂 Ваши открытые задачи:", reply_markup=markup)
+    elif update.message:
+        await update.message.reply_text("📂 Ваши открытые задачи:", reply_markup=markup)
 
 # ═══════════════════════════ создание задачи (FSM) ════════════════════════════
 
-async def start_create_issue(update: Update, context: CallbackContext):
-    """Шаг 0 FSM: предлагаем ввести заголовок."""
-    await update.message.reply_text(
-        "📋 Введите заголовок задачи:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")]])
-    )
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ContextTypes
+
+async def start_create_issue(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Шаг 0 FSM: предлагаем ввести заголовок (работает с inline-кнопками и командами)."""
+    markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")]
+    ])
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(
+            "📋 Введите заголовок задачи:",
+            reply_markup=markup
+        )
+    elif update.message:
+        await update.message.reply_text(
+            "📋 Введите заголовок задачи:",
+            reply_markup=markup
+        )
     return IssueStates.waiting_for_title
+
 
 # ─────────────────────────── заголовок задачи ────────────────────────────────
 
 async def process_issue_title(update: Update, context: CallbackContext):
     title = update.message.text.strip()
     if not title:
-        await update.message.reply_text("❌ Заголовок не может быть пустым. Повторите ввод:")
+        await safe_reply_text(update.message, "❌ Заголовок не может быть пустым. Повторите ввод:")
         return IssueStates.waiting_for_title
 
     context.user_data["issue_title"] = title
-    await update.message.reply_text(
-        "📝 Введите описание задачи (или отправьте /skip):",
+    await safe_reply_text(update.message, "📝 Введите описание задачи (или отправьте /skip):",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")]])
     )
     return IssueStates.waiting_for_description
@@ -97,8 +117,7 @@ async def process_issue_description(update: Update, context: CallbackContext):
 
 async def ask_for_attachments(update: Update, context: CallbackContext):
     """Просим пользователя загрузить вложения или завершить создание."""
-    await update.message.reply_text(
-        "📎 Прикрепите фото или нажмите 📤 Создать задачу:",
+    await safe_reply_text(update.message, "📎 Прикрепите фото или нажмите 📤 Создать задачу:",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
             [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")],
@@ -116,7 +135,7 @@ async def handle_attachment(update: Update, context: CallbackContext):
 
     file = update.message.photo[-1] if update.message.photo else update.message.document
     if not file:
-        await update.message.reply_text("❌ Поддерживаются только фото или документы.")
+        await safe_reply_text(update.message, "❌ Поддерживаются только фото или документы.")
         return IssueStates.waiting_for_attachment
 
     try:
@@ -134,8 +153,7 @@ async def handle_attachment(update: Update, context: CallbackContext):
         attachments.append(file_id)
         context.user_data["attachments"] = attachments
 
-        await update.message.reply_text(
-            f"📎 Загружено файлов: {len(attachments)}. Добавьте ещё или нажмите 📤 Создать задачу.",
+        await safe_reply_text(update.message, "📎 Загружено файлов: {len(attachments)}. Добавьте ещё или нажмите 📤 Создать задачу.",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
                 [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")],
@@ -143,10 +161,10 @@ async def handle_attachment(update: Update, context: CallbackContext):
         )
 
     except TelegramError:
-        await update.message.reply_text("❌ Не удалось получить файл из Telegram. Попробуйте снова.")
+        await safe_reply_text(update.message, "❌ Не удалось получить файл из Telegram. Попробуйте снова.")
     except Exception as exc:
         logging.exception("Ошибка загрузки вложения: %s", exc)
-        await update.message.reply_text("❌ Не удалось загрузить файл. Попробуйте ещё раз…")
+        await safe_reply_text(update.message, "❌ Не удалось загрузить файл. Попробуйте ещё раз…")
 
     return IssueStates.waiting_for_attachment
 
@@ -257,7 +275,7 @@ async def process_comment(update: Update, context: CallbackContext):
     tracker: TrackerAPI = context.bot_data["tracker"]
     issue_key: str | None = context.user_data.get("issue_key")
     if not issue_key:
-        await update.message.reply_text("❌ Сначала выберите задачу в списке.")
+        await safe_reply_text(update.message, "❌ Сначала выберите задачу в списке.")
         return ConversationHandler.END
 
     text = update.message.text.strip() if update.message.text else "📎 Вложение"
@@ -277,27 +295,30 @@ async def process_comment(update: Update, context: CallbackContext):
                 attachment_ids.append(file_id)
         except Exception as exc:
             logging.exception("Ошибка загрузки файла комментария: %s", exc)
-            await update.message.reply_text("❌ Не удалось загрузить файл. Попробуйте ещё раз…")
+            await safe_reply_text(update.message, "❌ Не удалось загрузить файл. Попробуйте ещё раз…")
             return IssueStates.waiting_for_comment
 
     # Отправляем комментарий в Tracker
     await tracker.add_comment(issue_key, text, attachment_ids)
-    await update.message.reply_text("✅ Комментарий добавлен.", reply_markup=main_reply_keyboard())
+    await safe_reply_text(update.message, "✅ Комментарий добавлен.", reply_markup=main_reply_keyboard())
     context.user_data.clear()
     return ConversationHandler.END
 
 # ═══════════════════════════ регистрация хендлеров ════════════════════════════
 
-def register_handlers(app: Application):
+def register_handlers(app):
     """Подключает все issue‑хендлеры к объекту Application."""
 
-    # Корректная async-заглушка для fallbacks
+    # Заглушка для отмены FSM через inline-кнопку
     async def do_nothing(update, context):
+        if update.callback_query:
+            await update.callback_query.answer()
         return ConversationHandler.END
 
     conv = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^📋 Создать задачу$"), start_create_issue),
+            CallbackQueryHandler(start_create_issue, pattern="^create_issue$")
         ],
         states={
             IssueStates.waiting_for_title: [
@@ -311,7 +332,7 @@ def register_handlers(app: Application):
                 MessageHandler(filters.PHOTO, handle_photo_or_album),
                 MessageHandler(filters.Document.IMAGE, handle_photo_or_album),
                 MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_attachment),
-                CallbackQueryHandler(confirm_issue_creation, pattern="^create_issue$"),
+                CallbackQueryHandler(confirm_issue_creation, pattern="^create_issue$")
             ],
             IssueStates.waiting_for_comment: [
                 MessageHandler(filters.ALL, process_comment),
@@ -324,11 +345,13 @@ def register_handlers(app: Application):
     )
     app.add_handler(conv)
 
-    # Отдельные хендлеры вне FSM
+    # Мои задачи: поддержка и reply, и inline
     app.add_handler(MessageHandler(filters.Regex("^📂 Мои задачи$"), my_issues))
+    app.add_handler(CallbackQueryHandler(my_issues, pattern="^my_issues$"))
+    # Выбор задачи по callback_data типа issue_KEY
     app.add_handler(CallbackQueryHandler(select_issue_for_comment, pattern="^issue_"))
 
-    # Общие ловцы альбомов (работают независимо от состояния)
+    # Общие ловцы альбомов и вложений (если нужны вне FSM)
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo_or_album))
     app.add_handler(MessageHandler(filters.Document.IMAGE, handle_photo_or_album))
 
