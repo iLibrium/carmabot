@@ -77,9 +77,11 @@ class TrackerAPI:
                 raise Exception(f"Search issues failed: {resp.status} {text}")
             return await resp.json()
 
-    async def add_comment(self, issue_key, comment):
+    async def add_comment(self, issue_key, comment, attachments=None):
         url = f"{self.base_url}/v2/issues/{issue_key}/comments"
         data = {"text": comment}
+        if attachments:
+            data["attachments"] = attachments
         session = await self.get_session()
         headers = self._get_headers()
         async with session.post(url, json=data, headers=headers) as resp:
