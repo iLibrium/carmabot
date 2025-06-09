@@ -27,7 +27,12 @@ class TrackerAPI:
             "Content-Type": "application/json",
         }
         if self.org_id:
-            headers["X-Org-Id"] = self.org_id
+            # Yandex Tracker Cloud uses the ``X-Cloud-Org-ID`` header. Some
+            # on-prem deployments still rely on ``X-Org-ID``, so include both
+            # to remain compatible while avoiding 403 errors about a missing
+            # organization.
+            headers["X-Cloud-Org-ID"] = self.org_id
+            headers["X-Org-ID"] = self.org_id
         return headers
 
     async def create_issue(self, title, description, extra_fields=None):
