@@ -31,9 +31,22 @@ class TrackerAPI:
             headers["X-Org-Id"] = self.org_id
         return headers
 
-    async def create_issue(self, title, description, extra_fields=None):
+    async def create_issue(
+        self,
+        title,
+        description,
+        attachments=None,
+        telegram_id=None,
+        extra_fields=None,
+    ):
         """
         Создание задачи в трекере.
+
+        :param attachments: список ``fileId`` для прикрепления к задаче
+        :param telegram_id: идентификатор автора, пишется в системное поле
+            ``telegramId``
+        :param extra_fields: словарь дополнительных полей, объединяется с
+            основными данными
         """
         url = f"{self.base_url}/v2/issues/"
         data = {
@@ -42,6 +55,10 @@ class TrackerAPI:
         }
         if self.queue:
             data["queue"] = self.queue
+        if attachments:
+            data["attachments"] = attachments
+        if telegram_id is not None:
+            data["telegramId"] = str(telegram_id)
         if extra_fields:
             data.update(extra_fields)
 
