@@ -27,7 +27,10 @@ class TrackerAPI:
             "Content-Type": "application/json",
         }
         if self.org_id:
-            headers["X-Org-Id"] = self.org_id
+            # Yandex Tracker expects the organization ID in the ``X-Org-ID``
+            # header. Previously ``X-Org-Id`` was used which caused a 403
+            # "Organization is not available" error when creating issues.
+            headers["X-Org-ID"] = self.org_id
         return headers
 
     async def create_issue(self, title, description, extra_fields=None):

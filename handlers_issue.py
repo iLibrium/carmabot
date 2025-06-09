@@ -5,7 +5,7 @@ import logging
 import os
 from collections import defaultdict
 from typing import Final, List, Dict
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, CallbackContext
 
 from telegram import (
     Update,
