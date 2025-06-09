@@ -97,7 +97,7 @@ class TrackerAPI:
         url = f"{self.base_url}/v2/attachments"
         session = await self.get_session()
         headers = self._get_headers()
-
+        
         form = aiohttp.FormData()
         form.add_field(
             "file",
