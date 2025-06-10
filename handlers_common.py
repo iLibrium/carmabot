@@ -5,7 +5,11 @@ import logging
 from telegram import Update, Message
 from telegram.ext import ContextTypes
 from telegram.ext import CallbackContext, ConversationHandler
-from send_monitor import safe_send_message, safe_reply_text
+from send_monitor import (
+    safe_send_message,
+    safe_reply_text,
+    safe_delete_message,
+)
 from telegram.ext import (
     CommandHandler, MessageHandler, CallbackQueryHandler, ConversationHandler, filters
 )
@@ -32,6 +36,8 @@ async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             "Главное меню:",
             reply_markup=main_reply_keyboard()
         )
+        await safe_delete_message(update.message)
+        await safe_delete_message(update.message)
 
 # ────────────────────────── /start  ─────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -63,6 +69,7 @@ async def show_user_info(update, context):
         f"Telegram: @{update.effective_user.username or 'Нет'}",
         parse_mode="HTML"
     )
+    await safe_delete_message(update.message)
 
 # ─────────────────── обработка контакта (регистрация) ────────────────────
 async def process_contact(update: Update, context: CallbackContext):
