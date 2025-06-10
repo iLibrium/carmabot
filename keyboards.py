@@ -28,7 +28,6 @@ def main_reply_keyboard() -> ReplyKeyboardMarkup:
     • «Создать задачу» запускает FSM‑процесс.
     • «Мои задачи» запрашивает открытые задачи пользователя.
     • «Моя информация» выводит профиль.
-    • «Очистить чат» – кастомная команда (реализация не показана).
     """
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -36,10 +35,7 @@ def main_reply_keyboard() -> ReplyKeyboardMarkup:
                 KeyboardButton("📋 Создать задачу"),
                 KeyboardButton("📂 Мои задачи"),
             ],
-            [
-                KeyboardButton("👤 Моя информация"),
-                KeyboardButton("🧹 Очистить чат"),
-            ],
+            [KeyboardButton("👤 Моя информация")],
         ],
         resize_keyboard=True,
     )
@@ -53,7 +49,6 @@ def main_inline_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton("📋 Создать задачу", callback_data="create_issue")],
             [InlineKeyboardButton("📂 Мои задачи", callback_data="my_issues")],
             [InlineKeyboardButton("👤 Моя информация", callback_data="my_info")],
-            [InlineKeyboardButton("🧹 Очистить чат", callback_data="clear_chat")],
         ]
     )
 
