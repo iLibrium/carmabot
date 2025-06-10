@@ -289,6 +289,8 @@ async def process_comment(update: Update, context: CallbackContext):
         await safe_reply_text(update.message, "❌ Сначала выберите задачу в списке.")
         return ConversationHandler.END
 
+    db: Database = context.bot_data["db"]
+
     text = (update.message.text or update.message.caption or "📎 Вложение").strip()
     attachment_ids: list[int] = []
 
@@ -309,9 +311,25 @@ async def process_comment(update: Update, context: CallbackContext):
             await safe_reply_text(update.message, "❌ Не удалось загрузить файл. Попробуйте ещё раз…")
             return IssueStates.waiting_for_comment
 
-    # Отправляем комментарий в Tracker
-    await tracker.add_comment(issue_key, text, attachment_ids)
-    await safe_reply_text(update.message, "✅ Комментарий добавлен.", reply_markup=main_reply_keyboard())
+    user = update.effective_user
+    user_info = await db.get_user(user.id) or {}
+    full_text = (
+        f"{text}\n\n---\n"
+        f"👤 {user.first_name} {user.last_name or ''}\n"
+        f"📞 {user_info.get('phone_number', 'неизвестно')}\n"
+        f"🔗 @{user.username or 'без username'}"
+    )
+
+    await tracker.add_comment(issue_key, full_text, attachment_ids)
+
+    issue = await tracker.get_issue_details(issue_key)
+    summary = issue.get("summary", issue_key)
+    await safe_reply_text(
+        update.message,
+        f"✅ Комментарий добавлен к задаче - <a href='https://tracker.yandex.ru/{issue_key}'>{summary}</a>",
+        parse_mode="HTML",
+        reply_markup=main_reply_keyboard(),
+    )
     context.user_data.clear()
     return ConversationHandler.END
 
