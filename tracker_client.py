@@ -97,6 +97,25 @@ class TrackerAPI:
         url = f"{self.base_url}/v2/attachments"
         session = await self.get_session()
         headers = self._get_headers()
+        headers.pop("Content-Type", None)
+
+        with open(file_path, "rb") as f:
+            form = aiohttp.FormData()
+            form.add_field(
+                "file",
+                f,
+                filename=os.path.basename(file_path),
+                content_type="application/octet-stream",
+            )
+
+            async with session.post(url, data=form, headers=headers) as resp:
+                if resp.status != 201:
+                    text = await resp.text()
+                    logger.error(f"Failed to upload file: {resp.status} {text}")
+                    raise Exception(f"Upload file failed: {resp.status} {text}")
+
+                json_resp = await resp.json()
+                return json_resp.get("id")
         
         form = aiohttp.FormData()
         form.add_field(
