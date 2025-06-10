@@ -1,4 +1,5 @@
 import logging
+import os
 import aiohttp
 
 logger = logging.getLogger(__name__)
@@ -92,19 +93,29 @@ class TrackerAPI:
             return await resp.json()
 
     async def upload_file(self, file_path):
-        url = f"{self.base_url}/v2/files"
+        """Uploads a file to Tracker and returns its attachment ID."""
+        url = f"{self.base_url}/v2/attachments"
         session = await self.get_session()
         headers = self._get_headers()
+        headers.pop("Content-Type", None)
+
         with open(file_path, "rb") as f:
-            data = f.read()
-        upload_headers = headers.copy()
-        upload_headers["Content-Type"] = "application/octet-stream"
-        async with session.post(url, data=data, headers=upload_headers) as resp:
-            if resp.status != 201:
-                text = await resp.text()
-                logger.error(f"Failed to upload file: {resp.status} {text}")
-                raise Exception(f"Upload file failed: {resp.status} {text}")
-            return await resp.json()
+            form = aiohttp.FormData()
+            form.add_field(
+                "file",
+                f,
+                filename=os.path.basename(file_path),
+                content_type="application/octet-stream",
+            )
+
+            async with session.post(url, data=form, headers=headers) as resp:
+                if resp.status != 201:
+                    text = await resp.text()
+                    logger.error(f"Failed to upload file: {resp.status} {text}")
+                    raise Exception(f"Upload file failed: {resp.status} {text}")
+
+                json_resp = await resp.json()
+                return json_resp.get("id")
 
     async def add_attachment_comment(self, issue_key, file_id):
         url = f"{self.base_url}/v2/issues/{issue_key}/comments"
