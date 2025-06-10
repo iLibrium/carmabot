@@ -152,7 +152,7 @@ async def handle_attachment(update: Update, context: CallbackContext):
         attachments.append(file_id)
         context.user_data["attachments"] = attachments
 
-        await safe_reply_text(update.message, "📎 Загружено файлов: {len(attachments)}. Добавьте ещё или нажмите 📤 Создать задачу.",
+        await safe_reply_text(update.message, f"📎 Загружено файлов: {len(attachments)}. Добавьте ещё или нажмите 📤 Создать задачу.",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
                 [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")],
