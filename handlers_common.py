@@ -52,7 +52,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message:
         await safe_reply_text(
             update.message,
-            "Чтобы продолжить, поделитесь контактом:",
+            "Чтобы двигаться дальше, поделитесь, пожалуйста, своим контактом 📱",
             reply_markup=contact_keyboard(),
         )
         await safe_delete_message(update.message)
