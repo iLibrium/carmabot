@@ -37,7 +37,10 @@ _album_buffer: Dict[str, List[Message]] = defaultdict(list)  # media_group_id ->
 # ═══════════════════════════ список задач ═════════════════════════════════════
 
 async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Отправляет пользователю клавиатуру с его активными задачами (универсально: inline-кнопка или текстовая команда)."""
+    """Отправляет список задач пользователя за исключением закрытых.
+
+    Функция работает и для inline-кнопок, и для текстовой команды.
+    """
     telegram_id = update.effective_user.id
     tracker: TrackerAPI = context.bot_data["tracker"]
 
@@ -53,16 +56,16 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not issues:
         if update.callback_query:
             await update.callback_query.answer()
-            await update.callback_query.edit_message_text("📭 У вас нет активных задач.", reply_markup=markup)
+            await update.callback_query.edit_message_text("📭 У вас нет задач.", reply_markup=markup)
         elif update.message:
-            await update.message.reply_text("📭 У вас нет активных задач.", reply_markup=markup)
+            await update.message.reply_text("📭 У вас нет задач.", reply_markup=markup)
         return
 
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text("📂 Ваши открытые задачи:", reply_markup=markup)
+        await update.callback_query.edit_message_text("📂 Ваши задачи:", reply_markup=markup)
     elif update.message:
-        await update.message.reply_text("📂 Ваши открытые задачи:", reply_markup=markup)
+        await update.message.reply_text("📂 Ваши задачи:", reply_markup=markup)
 
 # ═══════════════════════════ создание задачи (FSM) ════════════════════════════
 
@@ -321,7 +324,8 @@ def register_handlers(app):
     conv = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^📋 Создать задачу$"), start_create_issue),
-            CallbackQueryHandler(start_create_issue, pattern="^create_issue$")
+            CallbackQueryHandler(start_create_issue, pattern="^create_issue$"),
+            CallbackQueryHandler(select_issue_for_comment, pattern="^issue_")
         ],
         states={
             IssueStates.waiting_for_title: [
@@ -351,8 +355,6 @@ def register_handlers(app):
     # Мои задачи: поддержка и reply, и inline
     app.add_handler(MessageHandler(filters.Regex("^📂 Мои задачи$"), my_issues))
     app.add_handler(CallbackQueryHandler(my_issues, pattern="^my_issues$"))
-    # Выбор задачи по callback_data типа issue_KEY
-    app.add_handler(CallbackQueryHandler(select_issue_for_comment, pattern="^issue_"))
 
     # Общие ловцы альбомов и вложений (если нужны вне FSM)
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo_or_album))
