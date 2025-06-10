@@ -47,9 +47,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_info:
         await show_main_reply_menu(update, context)
         return ConversationHandler.END
-    # ... логика регистрации ...
-    # После успешной регистрации тоже вызвать:
-    # await show_main_reply_menu(update, context)
+
+    # Пользователь не найден в БД – просим отправить контакт
+    if update.message:
+        await safe_reply_text(
+            update.message,
+            "Чтобы продолжить, поделитесь контактом:",
+            reply_markup=contact_keyboard(),
+        )
+        await safe_delete_message(update.message)
+    return RegistrationStates.waiting_for_contact
 
 async def show_user_info(update, context):
     db = context.bot_data["db"]
@@ -85,8 +92,8 @@ async def process_contact(update: Update, context: CallbackContext):
         contact.phone_number,
     )
 
-    # После регистрации показываем главное меню.
-    await main_menu(update, context)
+    await safe_reply_text(update.message, "✅ Регистрация успешна!")
+    await show_main_reply_menu(update, context)
     return ConversationHandler.END
 
 
