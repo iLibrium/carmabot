@@ -28,7 +28,6 @@ from tracker_client import TrackerAPI
 from states import IssueStates
 from keyboards import (
     main_reply_keyboard,
-    main_inline_keyboard,
 )
 
 # ──────────────────────────── буфер медиа‑альбомов ─────────────────────────────
@@ -248,7 +247,8 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
 
     extra_fields = {"telegramId": str(user.id)}
     if attachments:
-        extra_fields["attachments"] = attachments
+        # При создании задачи вложения передаются через поле attachmentIds
+        extra_fields["attachmentIds"] = attachments
     issue = await tracker.create_issue(title, full_description, extra_fields)
     if issue and "key" in issue:
         await db.create_issue(user.id, issue["key"])

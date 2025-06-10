@@ -14,24 +14,23 @@ from states import RegistrationStates
 from database import Database
 from keyboards import (
     main_reply_keyboard,
-    main_inline_keyboard,
     contact_keyboard,
 )
 from states import RegistrationStates
 
 
-# Универсальная функция для вывода только inline-меню
-async def show_main_inline_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Универсальная функция для вывода главного меню с reply-кнопками
+async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text(
+        await update.callback_query.message.reply_text(
             "Главное меню:",
-            reply_markup=main_inline_keyboard()
+            reply_markup=main_reply_keyboard()
         )
     elif update.message:
         await update.message.reply_text(
             "Главное меню:",
-            reply_markup=main_inline_keyboard()
+            reply_markup=main_reply_keyboard()
         )
 
 # ────────────────────────── /start  ─────────────────────────────
@@ -40,11 +39,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db = context.bot_data["db"]
     user_info = await db.get_user(user_id)
     if user_info:
-        await show_main_inline_menu(update, context)
+        await show_main_reply_menu(update, context)
         return ConversationHandler.END
     # ... логика регистрации ...
     # После успешной регистрации тоже вызвать:
-    # await show_main_inline_menu(update, context)
+    # await show_main_reply_menu(update, context)
 
 async def show_user_info(update, context):
     db = context.bot_data["db"]
@@ -79,26 +78,25 @@ async def process_contact(update: Update, context: CallbackContext):
         contact.phone_number,
     )
 
-    # После регистрации показываем оба меню.
+    # После регистрации показываем главное меню.
     await main_menu(update, context)
     return ConversationHandler.END
 
 
 # ──────────────────────── главное меню (универсальное) ────────────────────
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Главный вход во все ситуации: всегда только inline-меню, без reply
-    """
+    """Отображает главное меню с reply-кнопками."""
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text(
+        await update.callback_query.edit_message_reply_markup(reply_markup=None)
+        await update.callback_query.message.reply_text(
             "Главное меню:",
-            reply_markup=main_inline_keyboard()
+            reply_markup=main_reply_keyboard()
         )
     elif update.message:
         await update.message.reply_text(
             "Главное меню:",
-            reply_markup=main_inline_keyboard()
+            reply_markup=main_reply_keyboard()
         )
 
 def register_handlers(application):
