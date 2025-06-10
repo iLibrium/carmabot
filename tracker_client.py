@@ -116,6 +116,23 @@ class TrackerAPI:
 
                 json_resp = await resp.json()
                 return json_resp.get("id")
+        
+        form = aiohttp.FormData()
+        form.add_field(
+            "file",
+            open(file_path, "rb"),
+            filename=os.path.basename(file_path),
+            content_type="application/octet-stream",
+        )
+
+        async with session.post(url, data=form, headers=headers) as resp:
+            if resp.status != 201:
+                text = await resp.text()
+                logger.error(f"Failed to upload file: {resp.status} {text}")
+                raise Exception(f"Upload file failed: {resp.status} {text}")
+
+            json_resp = await resp.json()
+            return json_resp.get("id")
 
     async def add_attachment_comment(self, issue_key, file_id):
         url = f"{self.base_url}/v2/issues/{issue_key}/comments"
