@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import html
 from collections import defaultdict
 from typing import Final, List, Dict
 from telegram.ext import ContextTypes, CallbackContext
@@ -22,7 +23,11 @@ from telegram.ext import (
 from states import IssueStates
 from states import IssueStates
 
-from send_monitor import safe_send_message, safe_reply_text
+from send_monitor import (
+    safe_send_message,
+    safe_reply_text,
+    safe_delete_message,
+)
 from database import Database
 from tracker_client import TrackerAPI
 from states import IssueStates
@@ -59,6 +64,7 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.callback_query.edit_message_text("📭 У вас нет задач.", reply_markup=markup)
         elif update.message:
             await update.message.reply_text("📭 У вас нет задач.", reply_markup=markup)
+            await safe_delete_message(update.message)
         return
 
     if update.callback_query:
@@ -66,6 +72,7 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.callback_query.edit_message_text("📂 Ваши задачи:", reply_markup=markup)
     elif update.message:
         await update.message.reply_text("📂 Ваши задачи:", reply_markup=markup)
+        await safe_delete_message(update.message)
 
 # ═══════════════════════════ создание задачи (FSM) ════════════════════════════
 
@@ -88,6 +95,7 @@ async def start_create_issue(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "📋 Введите заголовок задачи:",
             reply_markup=markup
         )
+        await safe_delete_message(update.message)
     return IssueStates.waiting_for_title
 
 
@@ -255,8 +263,12 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
     issue = await tracker.create_issue(title, full_description, extra_fields)
     if issue and "key" in issue:
         await db.create_issue(user.id, issue["key"])
+        text = (
+            f"✅ Задача {issue['key']} (https://tracker.yandex.ru/{issue['key']}) успешно создана!\n"
+            f"<b>Наименование:</b> {html.escape(title)}"
+        )
         await query.message.reply_text(
-            f"✅ Задача <a href='https://tracker.yandex.ru/{issue['key']}'>{issue['key']}</a> успешно создана!",
+            text,
             parse_mode="HTML",
             reply_markup=main_reply_keyboard(),  # показываем reply‑меню
         )
