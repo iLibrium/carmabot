@@ -35,7 +35,8 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
 
         comment_author = await tracker.get_comment_author(issue_key, comment_id)
 
-        telegram_id = tracker.get_issue(issue_key).get("telegramId")
+        issue_info = await tracker.get_issue(issue_key)
+        telegram_id = issue_info.get("telegramId")
         if not telegram_id:
             logging.warning(f"❌ Не найден telegramId для задачи {issue_key}")
             return {"status": "ignored"}
@@ -51,7 +52,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                 content_url = att["content_url"]
                 filename = att["filename"]
                 
-                async with session.get(content_url, headers=tracker.headers) as resp:
+                async with session.get(content_url, headers=tracker.get_headers()) as resp:
                     if resp.status != 200:
                         logging.error(f"Ошибка загрузки файла {filename}: {resp.status}")
                         continue
