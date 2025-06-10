@@ -62,11 +62,12 @@ class TrackerAPI:
             return await resp.json()
 
     async def get_active_issues_by_telegram_id(self, telegram_id: int):
+        """Return all user's issues except those in the closed status."""
         url = f"{self.base_url}/v2/issues/_search"
         query = {
             "filter": {
                 "queue": self.queue,
-                "telegramId": str(telegram_id)
+                "telegramId": str(telegram_id),
             }
         }
         session = await self.get_session()
@@ -76,7 +77,14 @@ class TrackerAPI:
                 text = await resp.text()
                 logger.error(f"Failed to search issues: {resp.status} {text}")
                 raise Exception(f"Search issues failed: {resp.status} {text}")
-            return await resp.json()
+            issues = await resp.json()
+
+        # Фильтруем закрытые задачи вручную
+        filtered = [
+            issue for issue in issues
+            if issue.get("status", {}).get("key") != "closed"
+        ]
+        return filtered
 
     async def add_comment(self, issue_key, comment, attachments=None):
         url = f"{self.base_url}/v2/issues/{issue_key}/comments"
@@ -116,23 +124,6 @@ class TrackerAPI:
 
                 json_resp = await resp.json()
                 return json_resp.get("id")
-        
-        form = aiohttp.FormData()
-        form.add_field(
-            "file",
-            open(file_path, "rb"),
-            filename=os.path.basename(file_path),
-            content_type="application/octet-stream",
-        )
-
-        async with session.post(url, data=form, headers=headers) as resp:
-            if resp.status != 201:
-                text = await resp.text()
-                logger.error(f"Failed to upload file: {resp.status} {text}")
-                raise Exception(f"Upload file failed: {resp.status} {text}")
-
-            json_resp = await resp.json()
-            return json_resp.get("id")
 
     async def add_attachment_comment(self, issue_key, file_id):
         url = f"{self.base_url}/v2/issues/{issue_key}/comments"
