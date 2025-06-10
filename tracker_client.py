@@ -62,11 +62,13 @@ class TrackerAPI:
             return await resp.json()
 
     async def get_active_issues_by_telegram_id(self, telegram_id: int):
+        """Return all user's issues except those in the closed status."""
         url = f"{self.base_url}/v2/issues/_search"
         query = {
             "filter": {
                 "queue": self.queue,
-                "telegramId": str(telegram_id)
+                "telegramId": str(telegram_id),
+                "minusStatuses": ["closed"],
             }
         }
         session = await self.get_session()
