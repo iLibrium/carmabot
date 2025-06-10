@@ -86,11 +86,42 @@ class TrackerAPI:
         ]
         return filtered
 
-    async def add_comment(self, issue_key, comment, attachments=None):
+    async def add_comment(
+        self,
+        issue_key,
+        comment,
+        attachment_ids=None,
+        summonees=None,
+        maillist_summonees=None,
+        markup_type="md",
+    ):
+        """Add a comment to an issue using the modern API.
+
+        Parameters
+        ----------
+        issue_key : str
+            Key of the issue.
+        comment : str
+            Comment text.
+        attachment_ids : list[str] | None
+            Temporary file identifiers for attachments.
+        summonees : list[str] | None
+            Users to mention in the comment.
+        maillist_summonees : list[str] | None
+            Mailing lists to mention.
+        markup_type : str
+            Markup type of ``comment``. ``md`` enables Markdown/YFM.
+        """
+
         url = f"{self.base_url}/v2/issues/{issue_key}/comments"
-        data = {"text": comment}
-        if attachments:
-            data["attachments"] = attachments
+        data = {"text": comment, "markupType": markup_type}
+        if attachment_ids:
+            data["attachmentIds"] = attachment_ids
+        if summonees:
+            data["summonees"] = summonees
+        if maillist_summonees:
+            data["maillistSummonees"] = maillist_summonees
+
         session = await self.get_session()
         headers = self._get_headers()
         async with session.post(url, json=data, headers=headers) as resp:

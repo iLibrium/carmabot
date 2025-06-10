@@ -273,7 +273,12 @@ async def select_issue_for_comment(update: Update, context: CallbackContext):
     query = update.callback_query
     issue_key = query.data.split("_", 1)[1]
     context.user_data["issue_key"] = issue_key
-    await query.message.reply_text("📝 Напишите комментарий или прикрепите файл…")
+    await query.message.reply_text(
+        "📝 Напишите комментарий или прикрепите файл…",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🔄 Главное меню", callback_data="main_menu")]]
+        ),
+    )
     return IssueStates.waiting_for_comment
 
 async def process_comment(update: Update, context: CallbackContext):
@@ -284,7 +289,7 @@ async def process_comment(update: Update, context: CallbackContext):
         await safe_reply_text(update.message, "❌ Сначала выберите задачу в списке.")
         return ConversationHandler.END
 
-    text = update.message.text.strip() if update.message.text else "📎 Вложение"
+    text = (update.message.text or update.message.caption or "📎 Вложение").strip()
     attachment_ids: list[int] = []
 
     # Если в сообщении есть файл — загружаем
