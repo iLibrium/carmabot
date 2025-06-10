@@ -31,6 +31,10 @@ class TrackerAPI:
             headers["X-Cloud-Org-ID"] = self.org_id
         return headers
 
+    def get_headers(self):
+        """Return headers for Tracker API requests."""
+        return self._get_headers()
+
     async def create_issue(self, title, description, extra_fields=None):
         url = f"{self.base_url}/v2/issues/"
         data = {
@@ -42,7 +46,7 @@ class TrackerAPI:
         if extra_fields:
             data.update(extra_fields)
         session = await self.get_session()
-        headers = self._get_headers()
+        headers = self.get_headers()
         async with session.post(url, json=data, headers=headers) as resp:
             if resp.status != 201:
                 text = await resp.text()
@@ -53,13 +57,64 @@ class TrackerAPI:
     async def get_issue_details(self, issue_key):
         url = f"{self.base_url}/v2/issues/{issue_key}"
         session = await self.get_session()
-        headers = self._get_headers()
+        headers = self.get_headers()
         async with session.get(url, headers=headers) as resp:
             if resp.status != 200:
                 text = await resp.text()
                 logger.error(f"Failed to get issue details: {resp.status} {text}")
                 raise Exception(f"Get issue failed: {resp.status} {text}")
             return await resp.json()
+
+    async def get_issue(self, issue_key):
+        """Fetch issue information."""
+        return await self.get_issue_details(issue_key)
+
+    async def get_comment_author(self, issue_key, comment_id):
+        """Return display name of the comment author."""
+        url = f"{self.base_url}/v2/issues/{issue_key}/comments/{comment_id}"
+        session = await self.get_session()
+        headers = self.get_headers()
+        async with session.get(url, headers=headers) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(
+                    f"Failed to get comment author: {resp.status} {text}"
+                )
+                raise Exception(
+                    f"Get comment author failed: {resp.status} {text}"
+                )
+            comment = await resp.json()
+        author_info = comment.get("createdBy") or comment.get("author") or {}
+        if isinstance(author_info, dict):
+            return author_info.get("display") or author_info.get("login")
+        return str(author_info)
+
+    async def get_attachments_for_comment(self, issue_key, comment_id):
+        """Return attachment info for a comment."""
+        url = (
+            f"{self.base_url}/v2/issues/{issue_key}/comments/{comment_id}?expand=attachments"
+        )
+        session = await self.get_session()
+        headers = self.get_headers()
+        async with session.get(url, headers=headers) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(
+                    f"Failed to get comment attachments: {resp.status} {text}"
+                )
+                raise Exception(
+                    f"Get attachments failed: {resp.status} {text}"
+                )
+            comment = await resp.json()
+        attachments = []
+        for att in comment.get("attachments", []):
+            content_url = None
+            if isinstance(att.get("urls"), dict):
+                content_url = att["urls"].get("download") or att["urls"].get("self")
+            content_url = content_url or att.get("contentUrl") or att.get("self")
+            filename = att.get("fileName") or att.get("name") or att.get("filename")
+            attachments.append({"content_url": content_url, "filename": filename})
+        return attachments
 
     async def get_active_issues_by_telegram_id(self, telegram_id: int):
         """Return all user's issues except those in the closed status."""
@@ -71,7 +126,7 @@ class TrackerAPI:
             }
         }
         session = await self.get_session()
-        headers = self._get_headers()
+        headers = self.get_headers()
         async with session.post(url, json=query, headers=headers) as resp:
             if resp.status != 200:
                 text = await resp.text()
@@ -123,7 +178,7 @@ class TrackerAPI:
             data["maillistSummonees"] = maillist_summonees
 
         session = await self.get_session()
-        headers = self._get_headers()
+        headers = self.get_headers()
         async with session.post(url, json=data, headers=headers) as resp:
             if resp.status != 201:
                 text = await resp.text()
@@ -135,7 +190,7 @@ class TrackerAPI:
         """Uploads a file to Tracker and returns its attachment ID."""
         url = f"{self.base_url}/v2/attachments"
         session = await self.get_session()
-        headers = self._get_headers()
+        headers = self.get_headers()
         headers.pop("Content-Type", None)
 
         with open(file_path, "rb") as f:
@@ -163,7 +218,7 @@ class TrackerAPI:
             "attachments": [file_id]
         }
         session = await self.get_session()
-        headers = self._get_headers()
+        headers = self.get_headers()
         async with session.post(url, json=data, headers=headers) as resp:
             if resp.status != 201:
                 text = await resp.text()
@@ -176,7 +231,7 @@ class TrackerAPI:
         if expand_attachments:
             url += "?expand=attachments"
         session = await self.get_session()
-        headers = self._get_headers()
+        headers = self.get_headers()
         async with session.get(url, headers=headers) as resp:
             if resp.status != 200:
                 text = await resp.text()
@@ -186,7 +241,7 @@ class TrackerAPI:
 
     async def get_file_content(self, file_self_url):
         session = await self.get_session()
-        headers = self._get_headers()
+        headers = self.get_headers()
         async with session.get(file_self_url, headers=headers) as resp:
             if resp.status != 200:
                 text = await resp.text()
