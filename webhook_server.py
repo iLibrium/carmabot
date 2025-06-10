@@ -27,22 +27,36 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         if data.get("event") != "commentCreated":
             return {"status": "ignored"}
 
-        issue = data.get("issue")
+        issue = data.get("issue") or {}
         comment_data = data.get("comment", {})
         issue_key = issue.get("key")
         comment_id = comment_data.get("id")
         issue_summary = issue.get("summary", "Нет темы")
 
-        comment_author = await tracker.get_comment_author(issue_key, comment_id)
+        comment_author = comment_data.get("createdBy", {}).get("display")
+        if not comment_author:
+            try:
+                comment_author = await tracker.get_comment_author(issue_key, comment_id)
+            except Exception as exc:
+                logging.error(f"Не удалось получить автора комментария: {exc}")
+                comment_author = "неизвестен"
 
-        issue_info = await tracker.get_issue(issue_key)
+        try:
+            issue_info = await tracker.get_issue(issue_key)
+        except Exception as exc:
+            logging.error(f"Не удалось получить информацию о задаче: {exc}")
+            return {"status": "error"}
         telegram_id = issue_info.get("telegramId")
         if not telegram_id:
             logging.warning(f"❌ Не найден telegramId для задачи {issue_key}")
             return {"status": "ignored"}
 
         chat_id = int(telegram_id)
-        attachments = await tracker.get_attachments_for_comment(issue_key, comment_id)
+        try:
+            attachments = await tracker.get_attachments_for_comment(issue_key, comment_id)
+        except Exception as exc:
+            logging.error(f"Не удалось получить вложения комментария: {exc}")
+            attachments = []
 
         media_photos = []
         documents = []
