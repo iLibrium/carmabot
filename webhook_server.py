@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
-import aiohttp
+import asyncio
 from telegram import InputMediaPhoto, InputFile
 from telegram.ext import Application
 from config import Config
@@ -61,27 +61,35 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         media_photos = []
         documents = []
 
-        async with aiohttp.ClientSession() as session:
-            for att in attachments:
-                content_url = att["content_url"]
-                filename = att["filename"]
-                
-                async with session.get(content_url, headers=tracker.get_headers()) as resp:
-                    if resp.status != 200:
-                        logging.error(f"Ошибка загрузки файла {filename}: {resp.status}")
-                        continue
-                    file_bytes = await resp.read()
+        session = await tracker.get_session()
 
-                file_path = os.path.join("/tmp", filename)
-                with open(file_path, "wb") as f:
-                    f.write(file_bytes)
-                
-                telegram_file = InputFile(file_path)
-                
-                if filename.lower().endswith((".jpg", ".png", ".jpeg")):
-                    media_photos.append(InputMediaPhoto(media=telegram_file))
-                else:
-                    documents.append(telegram_file)
+        async def download_attachment(att):
+            content_url = att["content_url"]
+            filename = att["filename"]
+            async with session.get(content_url, headers=tracker.get_headers()) as resp:
+                if resp.status != 200:
+                    logging.error(f"Ошибка загрузки файла {filename}: {resp.status}")
+                    return None
+                file_bytes = await resp.read()
+
+            file_path = os.path.join("/tmp", filename)
+            with open(file_path, "wb") as f:
+                f.write(file_bytes)
+
+            telegram_file = InputFile(file_path)
+            if filename.lower().endswith((".jpg", ".png", ".jpeg")):
+                return ("photo", InputMediaPhoto(media=telegram_file))
+            return ("document", telegram_file)
+
+        download_results = await asyncio.gather(*(download_attachment(att) for att in attachments))
+        for result in download_results:
+            if not result:
+                continue
+            kind, tg_file = result
+            if kind == "photo":
+                media_photos.append(tg_file)
+            else:
+                documents.append(tg_file)
         
         message_text = (
             f"💬 Добавлен комментарий - <a href='https://tracker.yandex.ru/{issue_key}'>{issue_summary}</a>\n\n"
