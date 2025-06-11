@@ -108,14 +108,16 @@ async def main() -> None:
     logging.info("🤖 Бот (polling) и FastAPI‑webhook стартуют…")
 
     # ───── параллельный запуск ─────
-    await asyncio.gather(
-        application.run_polling(),
-        run_webhook_server(args.host, args.port),
-    )
-
-    # закрываем ресурсы
-    await db.close()
-    logging.info("✅ Завершение работы: ресурсы освобождены")
+    try:
+        await asyncio.gather(
+            application.run_polling(),
+            run_webhook_server(args.host, args.port),
+        )
+    finally:
+        # закрываем ресурсы
+        await tracker.close()
+        await db.close()
+        logging.info("✅ Завершение работы: ресурсы освобождены")
 
 if __name__ == "__main__":
     nest_asyncio.apply()
