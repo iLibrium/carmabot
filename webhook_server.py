@@ -35,6 +35,8 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         comment_id = comment_data.get("id")
         issue_summary = issue.get("summary", "Нет темы")
 
+        telegram_id = issue.get("telegramId")
+
         comment_author = comment_data.get("createdBy", {}).get("display")
         if not comment_author:
             try:
@@ -43,12 +45,14 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                 logging.error(f"Не удалось получить автора комментария: {exc}")
                 comment_author = "неизвестен"
 
-        try:
-            issue_info = await tracker.get_issue(issue_key)
-        except Exception as exc:
-            logging.error(f"Не удалось получить информацию о задаче: {exc}")
-            return {"status": "error"}
-        telegram_id = issue_info.get("telegramId")
+        issue_info = None
+        if not telegram_id:
+            try:
+                issue_info = await tracker.get_issue(issue_key)
+            except Exception as exc:
+                logging.error(f"Не удалось получить информацию о задаче: {exc}")
+                return {"status": "error"}
+            telegram_id = issue_info.get("telegramId")
         if not telegram_id:
             logging.warning(f"❌ Не найден telegramId для задачи {issue_key}")
             return {"status": "ignored"}
