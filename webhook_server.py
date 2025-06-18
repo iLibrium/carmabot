@@ -78,18 +78,18 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
 
             telegram_file = InputFile(file_path)
             if filename.lower().endswith((".jpg", ".png", ".jpeg")):
-                return ("photo", InputMediaPhoto(media=telegram_file))
-            return ("document", telegram_file)
+                return ("photo", InputMediaPhoto(media=telegram_file), file_path)
+            return ("document", telegram_file, file_path)
 
         download_results = await asyncio.gather(*(download_attachment(att) for att in attachments))
         for result in download_results:
             if not result:
                 continue
-            kind, tg_file = result
+            kind, tg_file, file_path = result
             if kind == "photo":
-                media_photos.append(tg_file)
+                media_photos.append((tg_file, file_path))
             else:
-                documents.append(tg_file)
+                documents.append((tg_file, file_path))
         
         message_text = (
             f"💬 Добавлен комментарий - <a href='https://tracker.yandex.ru/{issue_key}'>{issue_summary}</a>\n\n"
@@ -99,10 +99,20 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         
         try:
             if media_photos:
-                await application.bot.send_media_group(chat_id, media_photos)
-            for doc in documents:
+                tg_photos = [item[0] for item in media_photos]
+                await application.bot.send_media_group(chat_id, tg_photos)
+                for _, path in media_photos:
+                    try:
+                        os.remove(path)
+                    except OSError as exc:
+                        logging.error("Не удалось удалить временный файл %s: %s", path, exc)
+            for doc, path in documents:
                 await application.bot.send_document(chat_id, doc)
-            
+                try:
+                    os.remove(path)
+                except OSError as exc:
+                    logging.error("Не удалось удалить временный файл %s: %s", path, exc)
+
             await application.bot.send_message(chat_id, message_text, parse_mode="HTML")
         except Exception as e:
             logging.error(f"❌ Ошибка при отправке сообщений в Telegram: {e}")
