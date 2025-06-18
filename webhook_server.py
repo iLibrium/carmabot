@@ -35,6 +35,26 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         comment_id = comment_data.get("id")
         issue_summary = issue.get("summary", "Нет темы")
 
+        def _valid_comment_id(cid):
+            if cid is None:
+                return False
+            if isinstance(cid, int):
+                return True
+            if isinstance(cid, str):
+                if cid.isdigit():
+                    return True
+                if len(cid) == 24:
+                    try:
+                        int(cid, 16)
+                        return True
+                    except ValueError:
+                        pass
+            return False
+
+        if not _valid_comment_id(comment_id):
+            logging.warning(f"Неверный comment id: {comment_id}")
+            return {"status": "ignored"}
+
         comment_author = comment_data.get("createdBy", {}).get("display")
         if not comment_author:
             try:
