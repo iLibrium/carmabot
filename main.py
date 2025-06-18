@@ -113,6 +113,7 @@ async def main() -> None:
         await application.initialize()
         await application.start()
         await application.updater.start_polling()
+
         server, server_task = await start_webhook_server(args.host, args.port)
         await server_task
     finally:
