@@ -103,7 +103,11 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
             for doc in documents:
                 await application.bot.send_document(chat_id, doc)
             
-            await application.bot.send_message(chat_id, message_text, parse_mode="HTML")
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=message_text,
+                parse_mode="HTML",
+            )
         except Exception as e:
             logging.error(f"❌ Ошибка при отправке сообщений в Telegram: {e}")
         
