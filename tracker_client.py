@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 import aiohttp
 
 logger = logging.getLogger(__name__)
@@ -10,17 +11,25 @@ class TrackerAPI:
         self.token = token
         self.org_id = org_id
         self.queue = queue
-        self._session = None
+        # Store sessions per event loop to avoid cross-loop errors
+        self._sessions = {}
 
     async def get_session(self):
-        if self._session is None or self._session.closed:
+        """Return an ``aiohttp`` session bound to the current event loop."""
+        loop = asyncio.get_running_loop()
+        session = self._sessions.get(loop)
+        if session is None or session.closed:
             timeout = aiohttp.ClientTimeout(total=60)
-            self._session = aiohttp.ClientSession(timeout=timeout)
-        return self._session
+            session = aiohttp.ClientSession(timeout=timeout)
+            self._sessions[loop] = session
+        return session
 
     async def close(self):
-        if self._session and not self._session.closed:
-            await self._session.close()
+        """Close all underlying sessions."""
+        for session in list(self._sessions.values()):
+            if session and not session.closed:
+                await session.close()
+        self._sessions.clear()
 
     def _get_headers(self):
         headers = {
