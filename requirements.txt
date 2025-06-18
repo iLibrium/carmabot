@@ -5,3 +5,4 @@ asyncpg
 python-dotenv
 uvicorn
 nest_asyncio
+pytest-asyncio
