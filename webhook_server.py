@@ -8,6 +8,8 @@ from config import Config
 from tracker_client import TrackerAPI
 import os
 
+app = FastAPI()
+
 router = APIRouter()
 bearer_scheme = HTTPBearer()
 
@@ -108,12 +110,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                         logging.error("Не удалось удалить временный файл %s: %s", path, exc)
             for doc, path in documents:
                 await application.bot.send_document(chat_id, doc)
-                try:
-                    os.remove(path)
-                except OSError as exc:
-                    logging.error("Не удалось удалить временный файл %s: %s", path, exc)
 
-            await application.bot.send_message(chat_id, message_text, parse_mode="HTML")
         except Exception as e:
             logging.error(f"❌ Ошибка при отправке сообщений в Telegram: {e}")
         

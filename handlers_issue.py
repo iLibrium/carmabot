@@ -21,7 +21,6 @@ from telegram.ext import (
     MessageHandler, CallbackQueryHandler, ConversationHandler, filters
 )
 from states import IssueStates
-from states import IssueStates
 
 from send_monitor import (
     safe_send_message,
@@ -30,7 +29,6 @@ from send_monitor import (
 )
 from database import Database
 from tracker_client import TrackerAPI
-from states import IssueStates
 from keyboards import (
     main_reply_keyboard,
 )
@@ -225,7 +223,7 @@ async def _process_album_later(group_id: str, context: CallbackContext):
     context.user_data["attachments"] = context.user_data.get("attachments", []) + attachments
 
     await context.bot.send_message(
-        chat_id,
+        chat_id=chat_id,
         text=f"📎 Загружено файлов: {len(attachments)}. Добавьте ещё или нажмите 📤 Создать задачу.",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
