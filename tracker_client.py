@@ -78,8 +78,15 @@ class TrackerAPI:
         """Fetch issue information."""
         return await self.get_issue_details(issue_key)
 
+    def _normalize_comment_id(self, comment_id):
+        """Return comment id cast to ``int`` if it's a digit-only string."""
+        if isinstance(comment_id, str) and comment_id.isdigit():
+            return int(comment_id)
+        return comment_id
+
     async def get_comment_author(self, issue_key, comment_id):
         """Return display name of the comment author."""
+        comment_id = self._normalize_comment_id(comment_id)
         url = f"{self.base_url}/v2/issues/{issue_key}/comments/{comment_id}"
         session = await self.get_session()
         headers = self.get_headers()
@@ -100,6 +107,7 @@ class TrackerAPI:
 
     async def get_attachments_for_comment(self, issue_key, comment_id):
         """Return attachment info for a comment."""
+        comment_id = self._normalize_comment_id(comment_id)
         url = (
             f"{self.base_url}/v2/issues/{issue_key}/comments/{comment_id}?expand=attachments"
         )
