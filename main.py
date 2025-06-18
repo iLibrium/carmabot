@@ -107,18 +107,16 @@ async def main() -> None:
 
     logging.info("🤖 Бот (polling) и FastAPI‑webhook стартуют…")
 
-    # ───── параллельный запуск ─────
+    # ───── запуск приложения и вебхука в одном event loop ─────
     try:
-        await asyncio.gather(
-            asyncio.to_thread(
-                application.run_polling,
-                close_loop=False,
-                stop_signals=None,
-            ),
-            run_webhook_server(args.host, args.port),
-        )
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling()
+        await run_webhook_server(args.host, args.port)
     finally:
-        # закрываем ресурсы
+        await application.updater.stop()
+        await application.stop()
+        await application.shutdown()
         await tracker.close()
         await db.close()
         logging.info("✅ Завершение работы: ресурсы освобождены")
