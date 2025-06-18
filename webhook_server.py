@@ -2,7 +2,7 @@ from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
 import asyncio
-from telegram import InputMediaPhoto, InputFile
+from telegram import InputMediaPhoto, InputFile, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application
 from config import Config
 from tracker_client import TrackerAPI
@@ -38,7 +38,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         telegram_id = issue.get("telegramId")
 
         comment_author = comment_data.get("createdBy", {}).get("display")
-        if not comment_author:
+        if not comment_author and comment_id:
             try:
                 comment_author = await tracker.get_comment_author(issue_key, comment_id)
             except Exception as exc:
@@ -58,11 +58,12 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
             return {"status": "ignored"}
 
         chat_id = int(telegram_id)
-        try:
-            attachments = await tracker.get_attachments_for_comment(issue_key, comment_id)
-        except Exception as exc:
-            logging.error(f"Не удалось получить вложения комментария: {exc}")
-            attachments = []
+        attachments = []
+        if comment_id:
+            try:
+                attachments = await tracker.get_attachments_for_comment(issue_key, comment_id)
+            except Exception as exc:
+                logging.error(f"Не удалось получить вложения комментария: {exc}")
 
         media_photos = []
         documents = []
@@ -102,8 +103,19 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
             f"<blockquote>{comment_data.get('text', '')}</blockquote>\n\n"
             f"<b>👤 Автор комментария:</b> {comment_author}"
         )
-        
+
+        reply_markup = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("💬 Ответить", callback_data=f"issue_{issue_key}")]]
+        )
+
         try:
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=message_text,
+                parse_mode="HTML",
+                reply_markup=reply_markup,
+            )
+
             if media_photos:
                 tg_photos = [item[0] for item in media_photos]
                 await application.bot.send_media_group(chat_id, tg_photos)
