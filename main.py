@@ -110,7 +110,11 @@ async def main() -> None:
     # ───── параллельный запуск ─────
     try:
         await asyncio.gather(
-            asyncio.to_thread(application.run_polling, close_loop=False),
+            asyncio.to_thread(
+                application.run_polling,
+                close_loop=False,
+                stop_signals=None,
+            ),
             run_webhook_server(args.host, args.port),
         )
     finally:
