@@ -6,3 +6,4 @@ python-dotenv
 uvicorn
 nest_asyncio
 pytest-asyncio
+httpx<0.28
