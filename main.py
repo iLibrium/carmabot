@@ -15,7 +15,6 @@ from telegram.request import HTTPXRequest
 from telegram.ext import ApplicationBuilder
 import telegram
 import contextlib
-logging.info("python-telegram-bot version: %s", telegram.__version__)
 
 
 from config import Config
@@ -31,7 +30,9 @@ from handlers_issue import register_handlers as register_issue_handlers
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    force=True,
 )
+logging.info("python-telegram-bot version: %s", telegram.__version__)
 
 # ────────────── .env ───────────────
 load_dotenv()
