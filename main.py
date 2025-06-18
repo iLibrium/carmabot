@@ -14,7 +14,7 @@ from httpx import Limits
 from telegram.request import HTTPXRequest
 from telegram.ext import ApplicationBuilder
 import telegram
-print("python-telegram-bot version:", telegram.__version__)
+logging.info("python-telegram-bot version: %s", telegram.__version__)
 
 
 from config import Config
