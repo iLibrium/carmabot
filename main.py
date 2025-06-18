@@ -45,11 +45,12 @@ TRACKER_BASE_URL = "https://api.tracker.yandex.net"
 # ────────────────────────── FastAPI приложение ───────────────────────────────
 fastapi_app = FastAPI()
 
-async def run_webhook_server(host: str, port: int) -> None:
-    """Запускает FastAPI‑сервер как отдельную async‑задачу."""
+async def start_webhook_server(host: str, port: int):
+    """Запускает FastAPI‑сервер и возвращает ``Server`` и задачу его работы."""
     config = uvicorn.Config(app=fastapi_app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
-    await server.serve()
+    server_task = asyncio.create_task(server.serve())
+    return server, server_task
 
 async def error_handler(update, context: ContextTypes.DEFAULT_TYPE):
     import traceback
@@ -112,11 +113,16 @@ async def main() -> None:
         await application.initialize()
         await application.start()
         await application.updater.start_polling()
-        await run_webhook_server(args.host, args.port)
+
+        server, server_task = await start_webhook_server(args.host, args.port)
+        await server_task
     finally:
         await application.updater.stop()
         await application.stop()
         await application.shutdown()
+        if 'server' in locals():
+            server.should_exit = True
+            await server_task
         await tracker.close()
         await db.close()
         logging.info("✅ Завершение работы: ресурсы освобождены")

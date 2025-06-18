@@ -72,3 +72,11 @@ async def test_get_attachments_for_comment():
     atts = await api.get_attachments_for_comment('ISSUE-1', '1')
     assert atts[0]['filename'] == 'file.txt'
     assert 'http://' in atts[0]['content_url']
+
+
+def test_normalize_comment_id():
+    api = TrackerAPI('http://example.com', 'TOKEN')
+    assert api._normalize_comment_id('123') == 123
+    hex_id = '507f1f77bcf86cd799439011'
+    assert api._normalize_comment_id(hex_id) == hex_id
+    assert api._normalize_comment_id(321) == 321
