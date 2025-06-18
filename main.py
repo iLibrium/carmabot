@@ -14,6 +14,7 @@ from httpx import Limits
 from telegram.request import HTTPXRequest
 from telegram.ext import ApplicationBuilder
 import telegram
+import contextlib
 logging.info("python-telegram-bot version: %s", telegram.__version__)
 
 
@@ -116,13 +117,16 @@ async def main() -> None:
 
         server, server_task = await start_webhook_server(args.host, args.port)
         await server_task
+    except KeyboardInterrupt:
+        logging.info("🛑 Keyboard interrupt received. Shutting down…")
     finally:
         await application.updater.stop()
         await application.stop()
         await application.shutdown()
         if 'server' in locals():
             server.should_exit = True
-            await server_task
+            with contextlib.suppress(Exception):
+                await server_task
         await tracker.close()
         await db.close()
         logging.info("✅ Завершение работы: ресурсы освобождены")
