@@ -15,7 +15,6 @@ from telegram.request import HTTPXRequest
 from telegram.ext import ApplicationBuilder
 import telegram
 import contextlib
-logging.info("python-telegram-bot version: %s", telegram.__version__)
 
 
 from config import Config
@@ -31,7 +30,9 @@ from handlers_issue import register_handlers as register_issue_handlers
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    force=True,
 )
+logging.info("python-telegram-bot version: %s", telegram.__version__)
 
 # ────────────── .env ───────────────
 load_dotenv()
@@ -50,6 +51,7 @@ async def start_webhook_server(host: str, port: int):
     """Запускает FastAPI‑сервер и возвращает ``Server`` и задачу его работы."""
     config = uvicorn.Config(app=fastapi_app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
+    logging.info("🌐 FastAPI сервер запускается на http://%s:%d", host, port)
     server_task = asyncio.create_task(server.serve())
     return server, server_task
 
@@ -114,19 +116,23 @@ async def main() -> None:
         await application.initialize()
         await application.start()
         await application.updater.start_polling()
+        logging.info("✅ Бот запущен и ожидает события")
 
         server, server_task = await start_webhook_server(args.host, args.port)
         await server_task
+        logging.info("✅ FastAPI сервер завершил работу")
     except KeyboardInterrupt:
         logging.info("🛑 Keyboard interrupt received. Shutting down…")
     finally:
         await application.updater.stop()
+        logging.info("✅ Бот остановлен")
         await application.stop()
         await application.shutdown()
         if 'server' in locals():
             server.should_exit = True
             with contextlib.suppress(Exception):
                 await server_task
+            logging.info("✅ FastAPI сервер остановлен")
         await tracker.close()
         await db.close()
         logging.info("✅ Завершение работы: ресурсы освобождены")
