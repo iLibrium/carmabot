@@ -37,7 +37,6 @@ async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             reply_markup=main_reply_keyboard()
         )
         await safe_delete_message(update.message)
-        await safe_delete_message(update.message)
 
 # ────────────────────────── /start  ─────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
