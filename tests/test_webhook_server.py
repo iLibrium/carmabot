@@ -112,3 +112,58 @@ def test_receive_webhook_without_comment_id():
     bot.send_message.assert_called_once()
     kwargs = bot.send_message.call_args.kwargs
     assert kwargs["chat_id"] == 123
+
+
+def test_update_status_with_telegram_id():
+    Config.API_TOKEN = "TOKEN"
+    application, tracker, bot = create_mocks()
+    app = create_app(application, tracker)
+    client = TestClient(app)
+
+    payload = {
+        "event": "issueUpdated",
+        "issue": {"key": "ISSUE-1", "summary": "Test", "telegramId": "123"},
+        "status": {"name": "In Progress"},
+        "changedBy": {"display": "Tester"},
+    }
+
+    response = client.post(
+        "/trackers/updateStatus",
+        json=payload,
+        headers={"Authorization": "Bearer TOKEN"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    tracker.get_issue.assert_not_called()
+    bot.send_message.assert_called_once()
+    kwargs = bot.send_message.call_args.kwargs
+    assert kwargs["chat_id"] == 123
+    assert kwargs["parse_mode"] == "HTML"
+
+
+def test_update_status_fallback_to_get_issue():
+    Config.API_TOKEN = "TOKEN"
+    application, tracker, bot = create_mocks(telegram_id="456")
+    app = create_app(application, tracker)
+    client = TestClient(app)
+
+    payload = {
+        "event": "issueUpdated",
+        "issue": {"key": "ISSUE-1", "summary": "Test"},
+        "status": {"name": "Closed"},
+        "changedBy": {"display": "Tester"},
+    }
+
+    response = client.post(
+        "/trackers/updateStatus",
+        json=payload,
+        headers={"Authorization": "Bearer TOKEN"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    tracker.get_issue.assert_called_once_with("ISSUE-1")
+    bot.send_message.assert_called_once()
+    kwargs = bot.send_message.call_args.kwargs
+    assert kwargs["chat_id"] == 456

@@ -133,4 +133,71 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         logging.info(f"✅ Комментарий отправлен в Telegram для задачи: {issue_key}")
         return {"status": "ok"}
 
+    @router.post("/trackers/updateStatus")
+    async def receive_status_webhook(
+        request: Request,
+        credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)
+    ):
+        if credentials.credentials != Config.API_TOKEN:
+            raise HTTPException(status_code=403, detail="Invalid Bearer token")
+
+        data = await request.json()
+        logging.info(f"📥 Status webhook получен: {data}")
+
+        if data.get("event") != "issueUpdated":
+            return {"status": "ignored"}
+
+        issue = data.get("issue") or {}
+        issue_key = issue.get("key")
+        issue_summary = issue.get("summary", "Нет темы")
+        telegram_id = issue.get("telegramId")
+
+        changed_by = data.get("changedBy") or data.get("updatedBy") or {}
+        if isinstance(changed_by, dict):
+            changed_by = changed_by.get("display") or changed_by.get("login")
+
+        status_data = data.get("status") or data.get("newStatus") or {}
+        status_name = (
+            status_data.get("display")
+            or status_data.get("name")
+            or status_data.get("key")
+        )
+
+        issue_info = None
+        if not telegram_id:
+            try:
+                issue_info = await tracker.get_issue(issue_key)
+            except Exception as exc:
+                logging.error(f"Не удалось получить информацию о задаче: {exc}")
+                return {"status": "error"}
+            telegram_id = issue_info.get("telegramId")
+        if not telegram_id:
+            logging.warning(f"❌ Не найден telegramId для задачи {issue_key}")
+            return {"status": "ignored"}
+
+        chat_id = int(telegram_id)
+
+        message_text = (
+            f"🔄 Статус задачи - <a href='https://tracker.yandex.ru/{issue_key}'>{issue_summary}</a>\n\n"
+            f"<b>Новый статус:</b> {status_name}\n"
+            f"<b>Кто изменил:</b> {changed_by}"
+        )
+
+        reply_markup = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("💬 Ответить", callback_data=f"issue_{issue_key}")]]
+        )
+
+        try:
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=message_text,
+                parse_mode="HTML",
+                reply_markup=reply_markup,
+            )
+        except Exception as e:
+            logging.error(f"❌ Ошибка при отправке сообщений в Telegram: {e}")
+
+        logging.info(f"✅ Изменение статуса отправлено в Telegram для задачи: {issue_key}")
+        return {"status": "ok"}
+
     app.include_router(router)
