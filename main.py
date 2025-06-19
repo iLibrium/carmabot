@@ -130,7 +130,9 @@ async def main() -> None:
         await application.shutdown()
         if 'server' in locals():
             server.should_exit = True
-            with contextlib.suppress(Exception):
+            # ``server_task`` could raise ``KeyboardInterrupt`` or ``CancelledError``
+            # during shutdown, which should be ignored to finish gracefully
+            with contextlib.suppress(Exception, asyncio.CancelledError, KeyboardInterrupt):
                 await server_task
             logging.info("✅ FastAPI сервер остановлен")
         await tracker.close()
