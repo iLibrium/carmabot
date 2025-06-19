@@ -107,7 +107,7 @@ async def main() -> None:
     register_issue_handlers(application)
 
     # ───── FastAPI маршруты вебхука ─────
-    setup_webhook_routes(fastapi_app, application.bot, tracker)
+    setup_webhook_routes(fastapi_app, application, tracker)
 
     logging.info("🤖 Бот (polling) и FastAPI‑webhook стартуют…")
 
