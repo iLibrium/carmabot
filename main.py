@@ -72,16 +72,23 @@ async def main() -> None:
     logging.info("🔎 Запуск бота...")
 
     # ───── создаём Telegram‑Application ─────
-    application = ApplicationBuilder()\
-        .token(BOT_TOKEN)\
+    application = (
+        ApplicationBuilder()
+        .token(BOT_TOKEN)
         .request(
             HTTPXRequest(
+                connection_pool_size=20,
                 read_timeout=60,
                 connect_timeout=30,
-                pool_limits=Limits(max_connections=20, max_keepalive_connections=10),
+                httpx_kwargs={
+                    "limits": Limits(
+                        max_connections=20, max_keepalive_connections=10
+                    )
+                },
             )
-        )\
+        )
         .build()
+    )
 
     application.add_error_handler(error_handler)
 
