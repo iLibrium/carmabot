@@ -221,7 +221,6 @@ def test_receive_webhook_skips_invalid_attachments():
     bot.send_document.assert_not_called()
     bot.send_media_group.assert_not_called()
 
-
 def test_receive_webhook_handles_display_attachment():
     Config.API_TOKEN = "TOKEN"
     application, tracker, bot = create_mocks()
