@@ -19,7 +19,8 @@ class Config:
         "id": "4",
         "display": "CRM",
     }
-    PRODUCT_FIELD_NAME = "67c0879c407b93717eac01e6--product"
+    PRODUCT_FIELD_NAME = "product"
+
     PRODUCT_VALUE = ["CRM"]
     DEFAULT_TAGS = ["Запрос"]
     
