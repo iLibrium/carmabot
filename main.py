@@ -141,4 +141,9 @@ async def main() -> None:
 
 if __name__ == "__main__":
     nest_asyncio.apply()
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        # ``uvicorn.Server`` re-raises the interrupt signal when shutting down
+        # which would otherwise surface as a traceback here.
+        pass
