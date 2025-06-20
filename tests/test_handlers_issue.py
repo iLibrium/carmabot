@@ -41,6 +41,5 @@ async def test_confirm_issue_creation_extra_fields():
 
     extra = tracker.create_issue.call_args.args[2]
     assert extra["project"] == Config.PROJECT
-    assert extra[Config.PRODUCT_FIELD_NAME] == Config.PRODUCT_VALUE
     assert extra["tags"] == Config.DEFAULT_TAGS
     assert extra["attachmentIds"] == [123]

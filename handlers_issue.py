@@ -286,7 +286,6 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
     extra_fields = {
         "telegramId": str(user.id),
         "project": Config.PROJECT,
-        Config.PRODUCT_FIELD_NAME: Config.PRODUCT_VALUE,
         "tags": Config.DEFAULT_TAGS,
     }
     if attachments:
