@@ -21,7 +21,6 @@ def create_app(application, tracker):
 def create_mocks(telegram_id=None):
     bot = MagicMock()
     bot.send_media_group = AsyncMock()
-    bot.send_photo = AsyncMock()
     bot.send_document = AsyncMock()
     bot.send_message = AsyncMock()
 
@@ -221,7 +220,6 @@ def test_receive_webhook_skips_invalid_attachments():
     bot.send_message.assert_called_once()
     bot.send_document.assert_not_called()
     bot.send_media_group.assert_not_called()
-    bot.send_photo.assert_not_called()
 
 def test_receive_webhook_handles_display_attachment():
     Config.API_TOKEN = "TOKEN"
@@ -254,8 +252,7 @@ def test_receive_webhook_handles_display_attachment():
     )
 
     assert response.status_code == 200
-    bot.send_photo.assert_called_once()
-    bot.send_media_group.assert_not_called()
+    bot.send_media_group.assert_called_once()
     bot.send_document.assert_called_once()
 
 
