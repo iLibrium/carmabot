@@ -2,6 +2,7 @@ from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
 import asyncio
+import re
 from telegram import InputMediaPhoto, InputFile, InlineKeyboardButton, InlineKeyboardMarkup
 from messages import WEBHOOK_COMMENT, WEBHOOK_STATUS
 from telegram.ext import Application
@@ -13,6 +14,17 @@ app = FastAPI()
 
 router = APIRouter()
 bearer_scheme = HTTPBearer()
+
+# Regex to strip markdown image links like ![alt](url)
+IMAGE_LINK_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+
+def strip_image_links(text: str) -> str:
+    """Remove markdown image links from text."""
+    if not text:
+        return ""
+    cleaned = IMAGE_LINK_RE.sub("", text)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    return cleaned.strip()
 
 def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
     """Настраивает маршруты вебхуков"""
@@ -72,8 +84,11 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         session = await tracker.get_session()
 
         async def download_attachment(att):
-            content_url = att["content_url"]
-            filename = att["filename"]
+            content_url = att.get("content_url")
+            filename = att.get("filename")
+            if not content_url or not filename:
+                logging.warning("Некорректные данные вложения: %s", att)
+                return None
             async with session.get(content_url, headers=tracker.get_headers()) as resp:
                 if resp.status != 200:
                     logging.error(f"Ошибка загрузки файла {filename}: {resp.status}")
@@ -99,10 +114,11 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
             else:
                 documents.append((tg_file, file_path))
         
+        clean_text = strip_image_links(comment_data.get("text", ""))
         message_text = WEBHOOK_COMMENT.format(
             issue_key=issue_key,
             issue_summary=issue_summary,
-            text=comment_data.get('text', ''),
+            text=clean_text,
             author=comment_author,
         )
 
