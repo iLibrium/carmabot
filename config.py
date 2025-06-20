@@ -11,6 +11,7 @@ class Config:
     TRACKER_TOKEN = os.getenv('TRACKER_TOKEN')
     TRACKER_ORG_ID = os.getenv('TRACKER_ORG_ID')
     TRACKER_QUEUE = os.getenv('TRACKER_QUEUE')  # Добавлено
+
     API_TOKEN = os.getenv('API_TOKEN')  # Добавлено
 
     # Default values for Tracker issue creation
@@ -21,6 +22,7 @@ class Config:
     }
     # Default tags for created issues
     DEFAULT_TAGS = ["Запрос"]
+
     
     # PostgreSQL
     DB_USER = os.getenv('DB_USER')
