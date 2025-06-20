@@ -110,7 +110,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
 
             telegram_file = InputFile(file_path)
             if filename.lower().endswith((".jpg", ".png", ".jpeg")):
-                return ("photo", InputMediaPhoto(media=telegram_file), file_path)
+                return ("photo", telegram_file, file_path)
             return ("document", telegram_file, file_path)
 
         download_results = await asyncio.gather(*(download_attachment(att) for att in attachments))
@@ -144,11 +144,11 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
             )
 
             if media_photos:
-                tg_photos = [item[0] for item in media_photos]
+                tg_photos = [InputMediaPhoto(media=file) for file, _ in media_photos]
                 if len(tg_photos) > 1:
                     await application.bot.send_media_group(chat_id, tg_photos)
                 else:
-                    await application.bot.send_photo(chat_id, tg_photos[0].media)
+                    await application.bot.send_photo(chat_id, media_photos[0][0])
                 for _, path in media_photos:
                     try:
                         os.remove(path)
