@@ -14,26 +14,30 @@ from telegram.ext import (
     CommandHandler, MessageHandler, CallbackQueryHandler, ConversationHandler, filters
 )
 from states import RegistrationStates
+from messages import (
+    MAIN_MENU,
+    REQUEST_CONTACT,
+    NOT_REGISTERED,
+    REGISTRATION_SUCCESS,
+)
 
 from database import Database
 from keyboards import (
     main_reply_keyboard,
     contact_keyboard,
 )
-from states import RegistrationStates
-
 
 # Универсальная функция для вывода главного меню с reply-кнопками
 async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.message.reply_text(
-            "Главное меню:",
+            MAIN_MENU,
             reply_markup=main_reply_keyboard()
         )
     elif update.message:
         await update.message.reply_text(
-            "Главное меню:",
+            MAIN_MENU,
             reply_markup=main_reply_keyboard()
         )
         await safe_delete_message(update.message)
@@ -51,7 +55,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message:
         await safe_reply_text(
             update.message,
-            "Чтобы двигаться дальше, поделитесь, пожалуйста, своим контактом 📱",
+            REQUEST_CONTACT,
             reply_markup=contact_keyboard(),
         )
         await safe_delete_message(update.message)
@@ -62,7 +66,7 @@ async def show_user_info(update, context):
     user_id = update.effective_user.id
     user_info = await db.get_user(user_id)
     if not user_info:
-        await update.message.reply_text("❌ Вы не зарегистрированы.")
+        await update.message.reply_text(NOT_REGISTERED)
         return
 
     full_name = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
@@ -91,7 +95,7 @@ async def process_contact(update: Update, context: CallbackContext):
         contact.phone_number,
     )
 
-    await safe_reply_text(update.message, "✅ Регистрация успешна!")
+    await safe_reply_text(update.message, REGISTRATION_SUCCESS)
     await show_main_reply_menu(update, context)
     return ConversationHandler.END
 
@@ -103,12 +107,12 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.answer()
         await update.callback_query.edit_message_reply_markup(reply_markup=None)
         await update.callback_query.message.reply_text(
-            "Главное меню:",
+            MAIN_MENU,
             reply_markup=main_reply_keyboard()
         )
     elif update.message:
         await update.message.reply_text(
-            "Главное меню:",
+            MAIN_MENU,
             reply_markup=main_reply_keyboard()
         )
 
