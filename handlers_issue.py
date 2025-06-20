@@ -382,6 +382,7 @@ def register_handlers(app):
             CallbackQueryHandler(do_nothing, pattern="^main_menu$"),
         ],
         name="issue_flow",
+        per_message=True,
     )
     app.add_handler(conv)
 
