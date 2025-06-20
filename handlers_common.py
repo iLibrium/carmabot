@@ -29,6 +29,7 @@ from keyboards import (
 
 # Универсальная функция для вывода главного меню с reply-кнопками
 async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info("show_main_reply_menu triggered by %s", update.effective_user.id)
     if update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.message.reply_text(
@@ -44,6 +45,7 @@ async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ────────────────────────── /start  ─────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info("/start by %s", update.effective_user.id)
     user_id = update.effective_user.id
     db = context.bot_data["db"]
     user_info = await db.get_user(user_id)
@@ -62,6 +64,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return RegistrationStates.waiting_for_contact
 
 async def show_user_info(update, context):
+    logging.info("show_user_info for %s", update.effective_user.id)
     db = context.bot_data["db"]
     user_id = update.effective_user.id
     user_info = await db.get_user(user_id)
@@ -84,6 +87,7 @@ async def show_user_info(update, context):
 # ─────────────────── обработка контакта (регистрация) ────────────────────
 async def process_contact(update: Update, context: CallbackContext):
     """Получает Contact, сохраняет в БД и выводит меню."""
+    logging.info("process_contact from %s", update.effective_user.id)
     user = update.effective_user
     contact = update.message.contact
 
@@ -103,6 +107,7 @@ async def process_contact(update: Update, context: CallbackContext):
 # ──────────────────────── главное меню (универсальное) ────────────────────
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отображает главное меню с reply-кнопками."""
+    logging.info("main_menu requested by %s", update.effective_user.id)
     if update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.edit_message_reply_markup(reply_markup=None)

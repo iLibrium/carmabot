@@ -62,6 +62,7 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     Функция работает и для inline-кнопок, и для текстовой команды.
     """
+    logging.info("my_issues requested by %s", update.effective_user.id)
     telegram_id = update.effective_user.id
     tracker: TrackerAPI = context.bot_data["tracker"]
 
@@ -97,6 +98,7 @@ from telegram.ext import ContextTypes
 
 async def start_create_issue(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Шаг 0 FSM: предлагаем ввести заголовок (работает с inline-кнопками и командами)."""
+    logging.info("start_create_issue by %s", update.effective_user.id)
     markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")]
     ])
@@ -118,6 +120,7 @@ async def start_create_issue(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ─────────────────────────── заголовок задачи ────────────────────────────────
 
 async def process_issue_title(update: Update, context: CallbackContext):
+    logging.info("process_issue_title from %s: %s", update.effective_user.id, update.message.text)
     title = update.message.text.strip()
     if not title:
         await safe_reply_text(update.message, TITLE_EMPTY)
@@ -132,10 +135,12 @@ async def process_issue_title(update: Update, context: CallbackContext):
 # ─────────────────────────── описание задачи ─────────────────────────────────
 
 async def skip_issue_description(update: Update, context: CallbackContext):
+    logging.info("skip_issue_description by %s", update.effective_user.id)
     context.user_data["issue_description"] = ""
     return await ask_for_attachments(update, context)
 
 async def process_issue_description(update: Update, context: CallbackContext):
+    logging.info("process_issue_description from %s: %s", update.effective_user.id, update.message.text)
     context.user_data["issue_description"] = update.message.text.strip()
     return await ask_for_attachments(update, context)
 
@@ -143,6 +148,7 @@ async def process_issue_description(update: Update, context: CallbackContext):
 
 async def ask_for_attachments(update: Update, context: CallbackContext):
     """Просим пользователя загрузить вложения или завершить создание."""
+    logging.info("ask_for_attachments for %s", update.effective_user.id)
     await safe_reply_text(update.message, ASK_FOR_ATTACHMENTS,
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
@@ -156,6 +162,7 @@ async def ask_for_attachments(update: Update, context: CallbackContext):
 
 async def handle_attachment(update: Update, context: CallbackContext):
     """Обрабатывает одиночное фото/документ и загружает его в Tracker."""
+    logging.info("handle_attachment from %s", update.effective_user.id)
     tracker: TrackerAPI = context.bot_data["tracker"]
     attachments = context.user_data.get("attachments", [])
 
@@ -198,6 +205,7 @@ async def handle_attachment(update: Update, context: CallbackContext):
 
 async def handle_photo_or_album(update: Update, context: CallbackContext):  # noqa: C901 (размер)
     """Собирает медиа‑группу целиком, после чего загружает все файлы пачкой."""
+    logging.info("handle_photo_or_album from %s", update.effective_user.id)
     if update.message.media_group_id:
         gid = update.message.media_group_id
         _album_buffer[gid].append(update.message)
@@ -210,6 +218,7 @@ async def handle_photo_or_album(update: Update, context: CallbackContext):  # no
 
 async def _process_album_later(group_id: str, context: CallbackContext):
     """Ждёт 2 секунды, чтобы Telegram прислал все фото, затем загружает."""
+    logging.info("processing album %s", group_id)
     await asyncio.sleep(2)
     messages = _album_buffer.pop(group_id, [])
     if not messages:
@@ -253,6 +262,7 @@ async def _process_album_later(group_id: str, context: CallbackContext):
 
 async def confirm_issue_creation(update: Update, context: CallbackContext):
     """Создаёт задачу в Tracker и сохраняет её в БД."""
+    logging.info("confirm_issue_creation by %s", update.effective_user.id)
     query = update.callback_query
     await query.answer()
 
@@ -279,6 +289,7 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
     issue = await tracker.create_issue(title, full_description, extra_fields)
     if issue and "key" in issue:
         await db.create_issue(user.id, issue["key"])
+        logging.info("issue %s created for %s", issue['key'], user.id)
         text = ISSUE_CREATED.format(key=issue['key'], title=html.escape(title))
         await query.message.reply_text(
             text,
@@ -287,6 +298,7 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
         )
     else:
         await query.message.reply_text(ISSUE_CREATION_ERROR)
+        logging.error("failed to create issue for %s", user.id)
 
     context.user_data.clear()
     return ConversationHandler.END
@@ -295,6 +307,7 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
 
 async def select_issue_for_comment(update: Update, context: CallbackContext):
     """Сохраняет выбранный `issue_key` и переводит FSM в режим ожидания комментария."""
+    logging.info("select_issue_for_comment %s", update.callback_query.data)
     query = update.callback_query
     issue_key = query.data.split("_", 1)[1]
     context.user_data["issue_key"] = issue_key
@@ -308,6 +321,7 @@ async def select_issue_for_comment(update: Update, context: CallbackContext):
 
 async def process_comment(update: Update, context: CallbackContext):
     """Добавляет текст и/или вложение в выбранную задачу."""
+    logging.info("process_comment from %s", update.effective_user.id)
     tracker: TrackerAPI = context.bot_data["tracker"]
     issue_key: str | None = context.user_data.get("issue_key")
     if not issue_key:
@@ -346,6 +360,7 @@ async def process_comment(update: Update, context: CallbackContext):
     )
 
     await tracker.add_comment(issue_key, full_text, attachment_ids)
+    logging.info("comment added to %s by %s", issue_key, user.id)
 
     issue = await tracker.get_issue_details(issue_key)
     summary = issue.get("summary", issue_key)
