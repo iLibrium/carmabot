@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
 import asyncio
 from telegram import InputMediaPhoto, InputFile, InlineKeyboardButton, InlineKeyboardMarkup
+from messages import WEBHOOK_COMMENT, WEBHOOK_STATUS
 from telegram.ext import Application
 from config import Config
 from tracker_client import TrackerAPI
@@ -98,10 +99,11 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
             else:
                 documents.append((tg_file, file_path))
         
-        message_text = (
-            f"💬 Добавлен комментарий - <a href='https://tracker.yandex.ru/{issue_key}'>{issue_summary}</a>\n\n"
-            f"<blockquote>{comment_data.get('text', '')}</blockquote>\n\n"
-            f"<b>👤 Автор комментария:</b> {comment_author}"
+        message_text = WEBHOOK_COMMENT.format(
+            issue_key=issue_key,
+            issue_summary=issue_summary,
+            text=comment_data.get('text', ''),
+            author=comment_author,
         )
 
         reply_markup = InlineKeyboardMarkup(
@@ -177,10 +179,11 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
 
         chat_id = int(telegram_id)
 
-        message_text = (
-            f"🔄 Статус задачи - <a href='https://tracker.yandex.ru/{issue_key}'>{issue_summary}</a>\n\n"
-            f"<b>Новый статус:</b> {status_name}\n"
-            f"<b>Кто изменил:</b> {changed_by}"
+        message_text = WEBHOOK_STATUS.format(
+            issue_key=issue_key,
+            issue_summary=issue_summary,
+            status_name=status_name,
+            changed_by=changed_by,
         )
 
         reply_markup = InlineKeyboardMarkup(

@@ -32,6 +32,24 @@ from tracker_client import TrackerAPI
 from keyboards import (
     main_reply_keyboard,
 )
+from messages import (
+    NO_ISSUES,
+    ISSUES_LIST,
+    ENTER_ISSUE_TITLE,
+    TITLE_EMPTY,
+    ENTER_ISSUE_DESCRIPTION,
+    ASK_FOR_ATTACHMENTS,
+    UNSUPPORTED_FILE,
+    FILES_UPLOADED,
+    TELEGRAM_DOWNLOAD_FAILED,
+    FILE_UPLOAD_FAILED,
+    ALBUM_FILE_FAILED,
+    ISSUE_CREATED,
+    ISSUE_CREATION_ERROR,
+    COMMENT_PROMPT,
+    NO_ISSUE_SELECTED,
+    COMMENT_ADDED,
+)
 
 # ──────────────────────────── буфер медиа‑альбомов ─────────────────────────────
 
@@ -59,17 +77,17 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not issues:
         if update.callback_query:
             await update.callback_query.answer()
-            await update.callback_query.edit_message_text("📭 У вас нет задач.", reply_markup=markup)
+            await update.callback_query.edit_message_text(NO_ISSUES, reply_markup=markup)
         elif update.message:
-            await update.message.reply_text("📭 У вас нет задач.", reply_markup=markup)
+            await update.message.reply_text(NO_ISSUES, reply_markup=markup)
             await safe_delete_message(update.message)
         return
 
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text("📂 Ваши задачи:", reply_markup=markup)
+        await update.callback_query.edit_message_text(ISSUES_LIST, reply_markup=markup)
     elif update.message:
-        await update.message.reply_text("📂 Ваши задачи:", reply_markup=markup)
+        await update.message.reply_text(ISSUES_LIST, reply_markup=markup)
         await safe_delete_message(update.message)
 
 # ═══════════════════════════ создание задачи (FSM) ════════════════════════════
@@ -85,12 +103,12 @@ async def start_create_issue(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.edit_message_text(
-            "📋 Введите заголовок задачи:",
+            ENTER_ISSUE_TITLE,
             reply_markup=markup
         )
     elif update.message:
         await update.message.reply_text(
-            "📋 Введите заголовок задачи:",
+            ENTER_ISSUE_TITLE,
             reply_markup=markup
         )
         await safe_delete_message(update.message)
@@ -102,11 +120,11 @@ async def start_create_issue(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def process_issue_title(update: Update, context: CallbackContext):
     title = update.message.text.strip()
     if not title:
-        await safe_reply_text(update.message, "❌ Заголовок не может быть пустым. Повторите ввод:")
+        await safe_reply_text(update.message, TITLE_EMPTY)
         return IssueStates.waiting_for_title
 
     context.user_data["issue_title"] = title
-    await safe_reply_text(update.message, "📝 Введите описание задачи (или отправьте /skip):",
+    await safe_reply_text(update.message, ENTER_ISSUE_DESCRIPTION,
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")]])
     )
     return IssueStates.waiting_for_description
@@ -125,7 +143,7 @@ async def process_issue_description(update: Update, context: CallbackContext):
 
 async def ask_for_attachments(update: Update, context: CallbackContext):
     """Просим пользователя загрузить вложения или завершить создание."""
-    await safe_reply_text(update.message, "📎 Прикрепите фото или нажмите 📤 Создать задачу:",
+    await safe_reply_text(update.message, ASK_FOR_ATTACHMENTS,
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
             [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")],
@@ -143,7 +161,7 @@ async def handle_attachment(update: Update, context: CallbackContext):
 
     file = update.message.photo[-1] if update.message.photo else update.message.document
     if not file:
-        await safe_reply_text(update.message, "❌ Поддерживаются только фото или документы.")
+        await safe_reply_text(update.message, UNSUPPORTED_FILE)
         return IssueStates.waiting_for_attachment
 
     try:
@@ -161,7 +179,7 @@ async def handle_attachment(update: Update, context: CallbackContext):
         attachments.append(file_id)
         context.user_data["attachments"] = attachments
 
-        await safe_reply_text(update.message, f"📎 Загружено файлов: {len(attachments)}. Добавьте ещё или нажмите 📤 Создать задачу.",
+        await safe_reply_text(update.message, FILES_UPLOADED.format(count=len(attachments)),
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
                 [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")],
@@ -169,10 +187,10 @@ async def handle_attachment(update: Update, context: CallbackContext):
         )
 
     except TelegramError:
-        await safe_reply_text(update.message, "❌ Не удалось получить файл из Telegram. Попробуйте снова.")
+        await safe_reply_text(update.message, TELEGRAM_DOWNLOAD_FAILED)
     except Exception as exc:
         logging.exception("Ошибка загрузки вложения: %s", exc)
-        await safe_reply_text(update.message, "❌ Не удалось загрузить файл. Попробуйте ещё раз…")
+        await safe_reply_text(update.message, FILE_UPLOAD_FAILED)
 
     return IssueStates.waiting_for_attachment
 
@@ -216,7 +234,7 @@ async def _process_album_later(group_id: str, context: CallbackContext):
                 attachments.append(file_id)
         except Exception as exc:
             logging.exception("Ошибка загрузки из альбома: %s", exc)
-            await safe_send_message(context.bot, chat_id=chat_id, text="❌ Не удалось загрузить одно из фото. Отправьте альбом снова.")
+            await safe_send_message(context.bot, chat_id=chat_id, text=ALBUM_FILE_FAILED)
             return  # прерываем весь альбом
 
     # складываем ID вложений в user_data
@@ -224,7 +242,7 @@ async def _process_album_later(group_id: str, context: CallbackContext):
 
     await context.bot.send_message(
         chat_id=chat_id,
-        text=f"📎 Загружено файлов: {len(attachments)}. Добавьте ещё или нажмите 📤 Создать задачу.",
+        text=FILES_UPLOADED.format(count=len(attachments)),
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
             [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")],
@@ -261,17 +279,14 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
     issue = await tracker.create_issue(title, full_description, extra_fields)
     if issue and "key" in issue:
         await db.create_issue(user.id, issue["key"])
-        text = (
-            f"✅ Задача {issue['key']} (https://tracker.yandex.ru/{issue['key']}) успешно создана!\n"
-            f"<b>Наименование:</b> {html.escape(title)}"
-        )
+        text = ISSUE_CREATED.format(key=issue['key'], title=html.escape(title))
         await query.message.reply_text(
             text,
             parse_mode="HTML",
             reply_markup=main_reply_keyboard(),  # показываем reply‑меню
         )
     else:
-        await query.message.reply_text("❌ Ошибка при создании задачи. Попробуйте позже.")
+        await query.message.reply_text(ISSUE_CREATION_ERROR)
 
     context.user_data.clear()
     return ConversationHandler.END
@@ -284,7 +299,7 @@ async def select_issue_for_comment(update: Update, context: CallbackContext):
     issue_key = query.data.split("_", 1)[1]
     context.user_data["issue_key"] = issue_key
     await query.message.reply_text(
-        "📝 Напишите комментарий или прикрепите файл…",
+        COMMENT_PROMPT,
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("🔄 Главное меню", callback_data="main_menu")]]
         ),
@@ -296,7 +311,7 @@ async def process_comment(update: Update, context: CallbackContext):
     tracker: TrackerAPI = context.bot_data["tracker"]
     issue_key: str | None = context.user_data.get("issue_key")
     if not issue_key:
-        await safe_reply_text(update.message, "❌ Сначала выберите задачу в списке.")
+        await safe_reply_text(update.message, NO_ISSUE_SELECTED)
         return ConversationHandler.END
 
     db: Database = context.bot_data["db"]
@@ -318,7 +333,7 @@ async def process_comment(update: Update, context: CallbackContext):
                 attachment_ids.append(file_id)
         except Exception as exc:
             logging.exception("Ошибка загрузки файла комментария: %s", exc)
-            await safe_reply_text(update.message, "❌ Не удалось загрузить файл. Попробуйте ещё раз…")
+            await safe_reply_text(update.message, FILE_UPLOAD_FAILED)
             return IssueStates.waiting_for_comment
 
     user = update.effective_user
@@ -336,7 +351,7 @@ async def process_comment(update: Update, context: CallbackContext):
     summary = issue.get("summary", issue_key)
     await safe_reply_text(
         update.message,
-        f"✅ Комментарий добавлен к задаче - <a href='https://tracker.yandex.ru/{issue_key}'>{summary}</a>",
+        COMMENT_ADDED.format(issue_key=issue_key, summary=summary),
         parse_mode="HTML",
         reply_markup=main_reply_keyboard(),
     )

@@ -21,6 +21,7 @@ from config import Config
 from database import Database
 from tracker_client import TrackerAPI
 from webhook_server import setup_webhook_routes
+from messages import TELEGRAM_ERROR
 
 # Импорт регистраторов хендлеров
 from handlers_common import register_handlers as register_common_handlers
@@ -59,7 +60,7 @@ async def error_handler(update, context: ContextTypes.DEFAULT_TYPE):
     import traceback
     logging.error("Exception caught: %s", traceback.format_exc())
     if update and hasattr(update, 'message') and update.message:
-        await update.message.reply_text("⚠️ Ошибка связи с Telegram. Попробуйте ещё раз.")
+        await update.message.reply_text(TELEGRAM_ERROR)
 
 async def main() -> None:
     """Главная асинхронная точка входа."""
