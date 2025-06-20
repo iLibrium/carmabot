@@ -152,7 +152,8 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                     else:
                         await application.bot.send_photo(chat_id, tg_photos[0].media)
                 except BadRequest as exc:
-                    if getattr(exc, "message", str(exc)) == "Image_process_failed":
+                    message = getattr(exc, "message", str(exc)).lower()
+                    if "image_process_failed" in message:
                         logging.warning(
                             "Image failed to process, sending as documents: %s",
                             exc,
