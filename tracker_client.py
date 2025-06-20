@@ -135,7 +135,17 @@ class TrackerAPI:
             if isinstance(att.get("urls"), dict):
                 content_url = att["urls"].get("download") or att["urls"].get("self")
             content_url = content_url or att.get("contentUrl") or att.get("self")
-            filename = att.get("fileName") or att.get("name") or att.get("filename")
+            if att.get("self") and (not content_url or content_url == att["self"]):
+                content_url = f"{att['self']}/download"
+            filename = (
+                att.get("fileName")
+                or att.get("name")
+                or att.get("filename")
+                or att.get("display")
+            )
+            if not content_url or not filename:
+                logger.warning("Skip attachment without filename or content url: %s", att)
+                continue
             attachments.append({"content_url": content_url, "filename": filename})
         return attachments
 
