@@ -149,6 +149,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                     await application.bot.send_media_group(chat_id, tg_photos)
                 else:
                     await application.bot.send_photo(chat_id, media_photos[0][0])
+
                 for _, path in media_photos:
                     try:
                         os.remove(path)
