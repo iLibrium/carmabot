@@ -72,8 +72,11 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         session = await tracker.get_session()
 
         async def download_attachment(att):
-            content_url = att["content_url"]
-            filename = att["filename"]
+            content_url = att.get("content_url")
+            filename = att.get("filename")
+            if not content_url or not filename:
+                logging.warning("Некорректные данные вложения: %s", att)
+                return None
             async with session.get(content_url, headers=tracker.get_headers()) as resp:
                 if resp.status != 200:
                     logging.error(f"Ошибка загрузки файла {filename}: {resp.status}")
