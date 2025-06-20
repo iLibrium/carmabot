@@ -7,6 +7,7 @@ import html
 from collections import defaultdict
 from typing import Final, List, Dict
 from telegram.ext import ContextTypes, CallbackContext
+from config import Config
 
 from telegram import (
     Update,
@@ -282,7 +283,12 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
         f"🔗 @{user.username or 'без username'}"
     )
 
-    extra_fields = {"telegramId": str(user.id)}
+    extra_fields = {
+        "telegramId": str(user.id),
+        "project": Config.PROJECT,
+        Config.PRODUCT_FIELD_NAME: Config.PRODUCT_VALUE,
+        "tags": Config.DEFAULT_TAGS,
+    }
     if attachments:
         # При создании задачи вложения передаются через поле attachmentIds
         extra_fields["attachmentIds"] = attachments
