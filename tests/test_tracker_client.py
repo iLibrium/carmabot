@@ -90,7 +90,7 @@ async def test_get_attachments_for_comment_display_name():
 
     atts = await api.get_attachments_for_comment('ISSUE-1', '1')
     assert atts[0]['filename'] == 'image.png'
-    assert 'http://' in atts[0]['content_url']
+    assert atts[0]['content_url'].endswith('/download')
 
 
 @pytest.mark.asyncio

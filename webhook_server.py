@@ -15,6 +15,9 @@ app = FastAPI()
 router = APIRouter()
 bearer_scheme = HTTPBearer()
 
+# In-memory store of processed comment IDs to prevent duplicates
+processed_comment_ids: set[str] = set()
+
 # Regex to strip markdown image links like ![alt](url)
 IMAGE_LINK_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 
@@ -47,6 +50,12 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         issue_key = issue.get("key")
         comment_id = comment_data.get("id")
         issue_summary = issue.get("summary", "Нет темы")
+
+        if comment_id and comment_id in processed_comment_ids:
+            logging.info("Duplicate comment %s ignored", comment_id)
+            return {"status": "ignored"}
+        if comment_id:
+            processed_comment_ids.add(str(comment_id))
 
         telegram_id = issue.get("telegramId")
 
