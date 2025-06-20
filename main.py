@@ -121,8 +121,8 @@ async def main() -> None:
         server, server_task = await start_webhook_server(args.host, args.port)
         await server_task
         logging.info("✅ FastAPI сервер завершил работу")
-    except KeyboardInterrupt:
-        logging.info("🛑 Keyboard interrupt received. Shutting down…")
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        logging.info("🛑 Interrupt received. Shutting down…")
     finally:
         await application.updater.stop()
         logging.info("✅ Бот остановлен")
