@@ -74,11 +74,13 @@ async def main() -> None:
     # ───── создаём Telegram‑Application ─────
     application = ApplicationBuilder()\
         .token(BOT_TOKEN)\
-        .request(HTTPXRequest(
-            read_timeout=60,
-            connect_timeout=30
-            # без pool_limits!
-        ))\
+        .request(
+            HTTPXRequest(
+                read_timeout=60,
+                connect_timeout=30,
+                pool_limits=Limits(max_connections=20, max_keepalive_connections=10),
+            )
+        )\
         .build()
 
     application.add_error_handler(error_handler)
