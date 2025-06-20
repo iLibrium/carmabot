@@ -4,6 +4,7 @@ import logging
 import asyncio
 import re
 from telegram import InputMediaPhoto, InputFile, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
 from messages import WEBHOOK_COMMENT, WEBHOOK_STATUS
 from telegram.ext import Application
 from config import Config
@@ -145,16 +146,27 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
 
             if media_photos:
                 tg_photos = [InputMediaPhoto(media=file) for file, _ in media_photos]
-                if len(tg_photos) > 1:
-                    await application.bot.send_media_group(chat_id, tg_photos)
-                else:
-                    await application.bot.send_photo(chat_id, media_photos[0][0])
-
-                for _, path in media_photos:
-                    try:
-                        os.remove(path)
-                    except OSError as exc:
-                        logging.error("Не удалось удалить временный файл %s: %s", path, exc)
+                try:
+                    if len(tg_photos) > 1:
+                        await application.bot.send_media_group(chat_id, tg_photos)
+                    else:
+                        await application.bot.send_photo(chat_id, tg_photos[0].media)
+                except BadRequest as exc:
+                    if getattr(exc, "message", str(exc)) == "Image_process_failed":
+                        logging.warning(
+                            "Image failed to process, sending as documents: %s",
+                            exc,
+                        )
+                        for doc, _ in media_photos:
+                            await application.bot.send_document(chat_id, doc)
+                    else:
+                        raise
+                finally:
+                    for _, path in media_photos:
+                        try:
+                            os.remove(path)
+                        except OSError as exc:
+                            logging.error("Не удалось удалить временный файл %s: %s", path, exc)
             for doc, path in documents:
                 await application.bot.send_document(chat_id, doc)
                 try:
