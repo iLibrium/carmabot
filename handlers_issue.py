@@ -287,6 +287,7 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
         "telegramId": str(user.id),
         "project": Config.PROJECT,
         "tags": Config.DEFAULT_TAGS,
+        Config.PRODUCT_CUSTOM_FIELD: Config.PRODUCT_DEFAULT,
     }
     if attachments:
         # При создании задачи вложения передаются через поле attachmentIds
