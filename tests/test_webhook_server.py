@@ -219,3 +219,4 @@ def test_receive_webhook_skips_invalid_attachments():
     bot.send_message.assert_called_once()
     bot.send_document.assert_not_called()
     bot.send_media_group.assert_not_called()
+
