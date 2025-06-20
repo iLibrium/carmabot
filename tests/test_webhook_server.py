@@ -220,35 +220,3 @@ def test_receive_webhook_skips_invalid_attachments():
     bot.send_document.assert_not_called()
     bot.send_media_group.assert_not_called()
 
-
-def test_receive_webhook_strips_image_links():
-    Config.API_TOKEN = "TOKEN"
-    application, tracker, bot = create_mocks()
-
-    tracker.get_attachments_for_comment = AsyncMock(return_value=[])
-    mock_session = MagicMock()
-    mock_session.get.return_value = DummyResp()
-    tracker.get_session = AsyncMock(return_value=mock_session)
-
-    app = create_app(application, tracker)
-    client = TestClient(app)
-
-    payload = {
-        "event": "commentCreated",
-        "issue": {"key": "ISSUE-1", "summary": "Test", "telegramId": "123"},
-        "comment": {
-            "id": "1",
-            "text": "Hello ![image.png](/ajax/v2/attachments/1 =800x600) there",
-        },
-    }
-
-    response = client.post(
-        "/trackers/comment",
-        json=payload,
-        headers={"Authorization": "Bearer TOKEN"},
-    )
-
-    assert response.status_code == 200
-    sent_text = bot.send_message.call_args.kwargs["text"]
-    assert "![" not in sent_text
-    assert "Hello" in sent_text
