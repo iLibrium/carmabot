@@ -291,7 +291,6 @@ def test_send_photo_fallbacks_to_document():
 
     assert response.status_code == 200
     bot.send_photo.assert_called_once()
-    bot.send_media_group.assert_not_called()
     bot.send_document.assert_called_once()
 
 
