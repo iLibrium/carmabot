@@ -19,11 +19,8 @@ class Config:
         "id": "4",
         "display": "CRM",
     }
-    # Some Tracker instances use a local field name that includes the queue ID
-    # (e.g. "{queueId}--product"), but this may not always be required.  The
-    # generic "product" field works if it is defined globally, so use it by
-    # default.
     PRODUCT_FIELD_NAME = "product"
+
     PRODUCT_VALUE = ["CRM"]
     DEFAULT_TAGS = ["Запрос"]
     
