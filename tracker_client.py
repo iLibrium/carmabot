@@ -157,10 +157,11 @@ class TrackerAPI:
                 raise Exception(f"Search issues failed: {resp.status} {text}")
             issues = await resp.json()
 
-        # Фильтруем закрытые задачи вручную
+        # Фильтруем закрытые и отменённые задачи вручную
         filtered = [
-            issue for issue in issues
-            if issue.get("status", {}).get("key") != "closed"
+            issue
+            for issue in issues
+            if issue.get("status", {}).get("key") not in {"closed", "canceled"}
         ]
         return filtered
 

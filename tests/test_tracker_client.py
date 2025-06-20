@@ -74,6 +74,22 @@ async def test_get_attachments_for_comment():
     assert 'http://' in atts[0]['content_url']
 
 
+@pytest.mark.asyncio
+async def test_get_active_issues_filters_statuses():
+    api = TrackerAPI('http://example.com', 'TOKEN', queue='CRM')
+    mock_session = MagicMock()
+    mock_session.post.return_value = MockResponse([
+        {'key': 'ISSUE-1', 'status': {'key': 'open'}},
+        {'key': 'ISSUE-2', 'status': {'key': 'closed'}},
+        {'key': 'ISSUE-3', 'status': {'key': 'canceled'}},
+    ])
+    api.get_session = AsyncMock(return_value=mock_session)
+
+    issues = await api.get_active_issues_by_telegram_id(1)
+    keys = [i['key'] for i in issues]
+    assert keys == ['ISSUE-1']
+
+
 def test_normalize_comment_id():
     api = TrackerAPI('http://example.com', 'TOKEN')
     assert api._normalize_comment_id('123') == 123

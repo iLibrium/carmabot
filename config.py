@@ -23,6 +23,10 @@ class Config:
     # Default tags for created issues
     DEFAULT_TAGS = ["Запрос"]
 
+    # Custom field for product selection
+    PRODUCT_CUSTOM_FIELD = "67c0879c407b93717eac01e6--product"
+    PRODUCT_DEFAULT = ["CRM"]
+
     
     # PostgreSQL
     DB_USER = os.getenv('DB_USER')

@@ -43,3 +43,4 @@ async def test_confirm_issue_creation_extra_fields():
     assert extra["project"] == Config.PROJECT
     assert extra["tags"] == Config.DEFAULT_TAGS
     assert extra["attachmentIds"] == [123]
+    assert extra[Config.PRODUCT_CUSTOM_FIELD] == Config.PRODUCT_DEFAULT
