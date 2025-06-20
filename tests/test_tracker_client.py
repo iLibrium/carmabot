@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 import os
 import sys
 
@@ -115,3 +115,24 @@ def test_normalize_comment_id():
     hex_id = '507f1f77bcf86cd799439011'
     assert api._normalize_comment_id(hex_id) == hex_id
     assert api._normalize_comment_id(321) == 321
+
+
+@pytest.mark.asyncio
+async def test_upload_file_uses_mimetype(tmp_path):
+    api = TrackerAPI('http://example.com', 'TOKEN')
+    dummy_session = MagicMock()
+    dummy_session.post.return_value = MockResponse({"id": 1}, status=201)
+    api.get_session = AsyncMock(return_value=dummy_session)
+
+    captured = {}
+
+    class DummyFD:
+        def add_field(self, name, f, filename=None, content_type=None):
+            captured["content_type"] = content_type
+
+    with patch('aiohttp.FormData', return_value=DummyFD()):
+        file_path = tmp_path / 'pic.png'
+        file_path.write_bytes(b'data')
+        await api.upload_file(str(file_path))
+
+    assert captured["content_type"] == 'image/png'

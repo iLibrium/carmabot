@@ -2,6 +2,7 @@ import logging
 import os
 import asyncio
 import aiohttp
+import mimetypes
 
 logger = logging.getLogger(__name__)
 
@@ -229,11 +230,12 @@ class TrackerAPI:
 
         with open(file_path, "rb") as f:
             form = aiohttp.FormData()
+            mime_type, _ = mimetypes.guess_type(file_path)
             form.add_field(
                 "file",
                 f,
                 filename=os.path.basename(file_path),
-                content_type="application/octet-stream",
+                content_type=mime_type or "application/octet-stream",
             )
 
             async with session.post(url, data=form, headers=headers) as resp:
