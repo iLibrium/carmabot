@@ -39,7 +39,7 @@ WEBHOOK_COMMENT = (
     "<b>👤 Автор комментария:</b> {author}"
 )
 WEBHOOK_STATUS = (
-    "🔄 Статус задачи - <a href='https://tracker.yandex.ru/{issue_key}'>{issue_summary}</a>\n\n"
-    "<b>Новый статус:</b> {status_name}\n"
-    "<b>Кто изменил:</b> {changed_by}"
+    "🔄 Статус задачи - <a href='https://tracker.yandex.ru/{issue_key}'>{issue_summary}</a> изменен...\n\n"
+    "<b>📊 Новый статус:</b> {status_name}\n"
+    "<b>👤 Кто изменил:</b> {changed_by}"
 )
