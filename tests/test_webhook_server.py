@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock
+from telegram.error import BadRequest
 import os
 import sys
 
@@ -256,6 +257,40 @@ def test_receive_webhook_handles_display_attachment():
     assert response.status_code == 200
     bot.send_photo.assert_called_once()
     bot.send_media_group.assert_not_called()
+    bot.send_document.assert_called_once()
+
+
+def test_send_photo_fallbacks_to_document():
+    Config.API_TOKEN = "TOKEN"
+    application, tracker, bot = create_mocks()
+
+    tracker.get_attachments_for_comment = AsyncMock(
+        return_value=[{"content_url": "http://files/image.png", "filename": "image.png"}]
+    )
+
+    mock_session = MagicMock()
+    mock_session.get.return_value = DummyResp()
+    tracker.get_session = AsyncMock(return_value=mock_session)
+
+    bot.send_photo.side_effect = BadRequest("Image_process_failed")
+
+    app = create_app(application, tracker)
+    client = TestClient(app)
+
+    payload = {
+        "event": "commentCreated",
+        "issue": {"key": "ISSUE-1", "summary": "Test", "telegramId": "123"},
+        "comment": {"id": "1", "text": "hi"},
+    }
+
+    response = client.post(
+        "/trackers/comment",
+        json=payload,
+        headers={"Authorization": "Bearer TOKEN"},
+    )
+
+    assert response.status_code == 200
+    bot.send_photo.assert_called_once()
     bot.send_document.assert_called_once()
 
 
