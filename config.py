@@ -12,6 +12,15 @@ class Config:
     TRACKER_ORG_ID = os.getenv('TRACKER_ORG_ID')
     TRACKER_QUEUE = os.getenv('TRACKER_QUEUE')  # Добавлено
     API_TOKEN = os.getenv('API_TOKEN')  # Добавлено
+
+    # Default values for Tracker issue creation
+    PROJECT = {
+        "self": "https://api.tracker.yandex.net/v2/projects/4",
+        "id": "4",
+        "display": "CRM",
+    }
+    # Default tags for created issues
+    DEFAULT_TAGS = ["Запрос"]
     
     # PostgreSQL
     DB_USER = os.getenv('DB_USER')
