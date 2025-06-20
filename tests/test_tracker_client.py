@@ -75,6 +75,25 @@ async def test_get_attachments_for_comment():
 
 
 @pytest.mark.asyncio
+async def test_get_attachments_for_comment_display_name():
+    api = TrackerAPI('http://example.com', 'TOKEN')
+    mock_session = MagicMock()
+    mock_session.get.return_value = MockResponse({
+        'attachments': [
+            {
+                'display': 'image.png',
+                'self': 'http://files/image.png'
+            }
+        ]
+    })
+    api.get_session = AsyncMock(return_value=mock_session)
+
+    atts = await api.get_attachments_for_comment('ISSUE-1', '1')
+    assert atts[0]['filename'] == 'image.png'
+    assert atts[0]['content_url'].endswith('/download')
+
+
+@pytest.mark.asyncio
 async def test_get_active_issues_filters_statuses():
     api = TrackerAPI('http://example.com', 'TOKEN', queue='CRM')
     mock_session = MagicMock()
