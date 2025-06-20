@@ -13,6 +13,7 @@ class TrackerAPI:
         self.queue = queue
         # Store sessions per event loop to avoid cross-loop errors
         self._sessions = {}
+        self._connector = None
 
     async def get_session(self):
         """Return an ``aiohttp`` session bound to the current event loop."""
@@ -20,7 +21,9 @@ class TrackerAPI:
         session = self._sessions.get(loop)
         if session is None or session.closed:
             timeout = aiohttp.ClientTimeout(total=60)
-            session = aiohttp.ClientSession(timeout=timeout)
+            if self._connector is None or self._connector.closed:
+                self._connector = aiohttp.TCPConnector(limit=20)
+            session = aiohttp.ClientSession(timeout=timeout, connector=self._connector)
             self._sessions[loop] = session
         return session
 
@@ -30,6 +33,9 @@ class TrackerAPI:
             if session and not session.closed:
                 await session.close()
         self._sessions.clear()
+        if self._connector and not self._connector.closed:
+            await self._connector.close()
+        self._connector = None
 
     def _get_headers(self):
         headers = {
