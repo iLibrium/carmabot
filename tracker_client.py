@@ -139,6 +139,7 @@ class TrackerAPI:
                 att.get("fileName")
                 or att.get("name")
                 or att.get("filename")
+
             )
             if not content_url or not filename:
                 logger.warning("Skip attachment without filename or content url: %s", att)
