@@ -36,7 +36,7 @@ IMAGE_LINK_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 # Regex to strip Tracker file links like :file[name](url){type="..."}
 FILE_LINK_RE = re.compile(r":file\[[^\]]*\]\([^)]*\)(?:\{[^}]*\})?")
 # Regex to remove signature lines appended by the bot
-SIGNATURE_RE = re.compile(r"\n?---\n👤.*?\n---\n?", re.DOTALL)
+SIGNATURE_RE = re.compile(r"\n?---\n(?:\s*👤|\s*\ud83d\udc64).*?\n---\n?", re.DOTALL)
 
 
 def strip_image_links(text: str) -> str:
@@ -45,7 +45,7 @@ def strip_image_links(text: str) -> str:
         return ""
     cleaned = IMAGE_LINK_RE.sub("", text)
     cleaned = FILE_LINK_RE.sub("", cleaned)
-    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    cleaned = re.sub(r"[^\S\r\n]{2,}", " ", cleaned)
     return cleaned.strip()
 
 def strip_reply_prefix(text: str) -> str:
@@ -53,9 +53,16 @@ def strip_reply_prefix(text: str) -> str:
     if not text:
         return ""
     lines = text.splitlines()
-    while lines and lines[0].lstrip().startswith(">"):
-        lines.pop(0)
-    return "\n".join(lines).lstrip()
+    start = 0
+    for i, line in enumerate(lines):
+        if re.match(r"^\s*>*\s*(?:---|{% endcut %})", line.strip()):
+            start = i
+            break
+    if start:
+        remainder = lines[start:]
+        remainder = [re.sub(r"^>\s?", "", l) for l in remainder]
+        return "\n".join(remainder).lstrip()
+    return text
 
 def strip_signature(text: str) -> str:
     """Remove user signature appended by the bot."""
@@ -65,7 +72,10 @@ def strip_signature(text: str) -> str:
 
 def sanitize_comment_text(text: str) -> str:
     """Apply basic cleanup to a Tracker comment."""
-    return strip_image_links(text)
+    text = strip_image_links(text)
+    text = strip_reply_prefix(text)
+    text = strip_signature(text)
+    return text
 
 def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
     """Настраивает маршруты вебхуков"""
