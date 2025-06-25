@@ -426,7 +426,7 @@ def test_download_attachment_sanitizes_filename(monkeypatch):
     captured_paths = []
 
     class DummyInputFile:
-        def __init__(self, path):
+        def __init__(self, path, filename=None):
             captured_paths.append(path)
 
     monkeypatch.setattr(sys.modules["webhook_server"], "InputFile", DummyInputFile)
@@ -447,5 +447,57 @@ def test_download_attachment_sanitizes_filename(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert captured_paths and captured_paths[0] == "/tmp/evil.txt"
+    assert captured_paths
+    basename = os.path.basename(captured_paths[0])
+    assert basename.endswith("_evil.txt")
     assert not os.path.exists(captured_paths[0])
+
+
+def test_download_attachment_unique_paths(monkeypatch):
+    Config.API_TOKEN = "TOKEN"
+    application, tracker, bot = create_mocks()
+
+    tracker.get_attachments_for_comment = AsyncMock(
+        return_value=[
+            {"content_url": "http://files/doc1.txt", "filename": "same.txt"},
+            {"content_url": "http://files/doc2.txt", "filename": "same.txt"},
+        ]
+    )
+
+    mock_session = MagicMock()
+    mock_session.get.return_value = DummyResp(b"data")
+    tracker.get_session = AsyncMock(return_value=mock_session)
+
+    captured = []
+
+    class DummyInputFile:
+        def __init__(self, path, filename=None):
+            captured.append((path, filename))
+
+    monkeypatch.setattr(sys.modules["webhook_server"], "InputFile", DummyInputFile)
+
+    app = create_app(application, tracker)
+    client = TestClient(app)
+
+    payload = {
+        "event": "commentCreated",
+        "issue": {"key": "ISSUE-1", "summary": "Test", "telegramId": "123"},
+        "comment": {"id": "1", "text": "hi"},
+    }
+
+    response = client.post(
+        "/trackers/comment",
+        json=payload,
+        headers={"Authorization": "Bearer TOKEN"},
+    )
+
+    assert response.status_code == 200
+    assert len(captured) == 2
+    path1, fname1 = captured[0]
+    path2, fname2 = captured[1]
+    assert path1 != path2
+    assert fname1 == fname2 == "same.txt"
+    assert os.path.basename(path1).endswith("_same.txt")
+    assert os.path.basename(path2).endswith("_same.txt")
+    assert not os.path.exists(path1)
+    assert not os.path.exists(path2)

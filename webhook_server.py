@@ -11,6 +11,7 @@ from telegram.ext import Application
 from config import Config
 from tracker_client import TrackerAPI
 import os
+import uuid
 
 app = FastAPI()
 
@@ -119,11 +120,12 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                 file_bytes = await resp.read()
 
             safe_name = os.path.basename(filename)
-            file_path = os.path.join("/tmp", safe_name)
+            unique_name = f"{uuid.uuid4().hex}_{safe_name}"
+            file_path = os.path.join("/tmp", unique_name)
             with open(file_path, "wb") as f:
                 f.write(file_bytes)
 
-            telegram_file = InputFile(file_path)
+            telegram_file = InputFile(file_path, filename=filename)
             if filename.lower().endswith((".jpg", ".png", ".jpeg")):
                 return ("photo", telegram_file, file_path)
             return ("document", telegram_file, file_path)
