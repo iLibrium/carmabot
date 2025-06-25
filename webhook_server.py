@@ -36,7 +36,7 @@ IMAGE_LINK_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 # Regex to strip Tracker file links like :file[name](url){type="..."}
 FILE_LINK_RE = re.compile(r":file\[[^\]]*\]\([^)]*\)(?:\{[^}]*\})?")
 # Regex to remove signature lines appended by the bot
-SIGNATURE_RE = re.compile(r"\n?---\n👤.*", re.DOTALL)
+SIGNATURE_RE = re.compile(r"\n?---\n👤.*?\n---\n?", re.DOTALL)
 
 
 def strip_image_links(text: str) -> str:
