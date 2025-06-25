@@ -221,8 +221,17 @@ class TrackerAPI:
                 raise Exception(f"Add comment failed: {resp.status} {text}")
             return await resp.json()
 
-    async def upload_file(self, file_path):
-        """Uploads a file to Tracker and returns its attachment ID."""
+    async def upload_file(self, file_path, orig_filename=None):
+        """Uploads a file to Tracker and returns its attachment ID.
+
+        Parameters
+        ----------
+        file_path : str
+            Path to a temporary file to read from.
+        orig_filename : str | None
+            Original filename to pass to Tracker. If ``None`` the basename of
+            ``file_path`` is used.
+        """
         url = f"{self.base_url}/v2/attachments"
         session = await self.get_session()
         headers = self.get_headers()
@@ -234,7 +243,7 @@ class TrackerAPI:
             form.add_field(
                 "file",
                 f,
-                filename=os.path.basename(file_path),
+                filename=orig_filename or os.path.basename(file_path),
                 content_type=mime_type or "application/octet-stream",
             )
 
