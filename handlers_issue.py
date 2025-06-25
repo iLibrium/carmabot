@@ -288,7 +288,8 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
         f"{description}\n\n---\n"
         f"👤 {user.first_name} {user.last_name or ''}\n"
         f"📞 {user_info.get('phone_number', 'неизвестно')}\n"
-        f"🔗 @{user.username or 'без username'}"
+        f"🔗 @{user.username or 'без username'}\n"
+        f"{description}\n\n---\n"
     )
 
     extra_fields = {
