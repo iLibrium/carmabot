@@ -40,3 +40,25 @@ async def test_registration_flow(monkeypatch):
     result = await process_contact(update_contact, context)
     assert result == ConversationHandler.END
     db.register_user.assert_awaited_once_with(1, "A", "B", "111")
+
+
+@pytest.mark.asyncio
+async def test_start_registration_button(monkeypatch):
+    update = MagicMock()
+    message = MagicMock()
+    message.text = "📝 Зарегистрироваться"
+    update.message = message
+    update.effective_user = MagicMock(id=1)
+
+    context = MagicMock()
+    db = MagicMock()
+    db.get_user = AsyncMock(return_value=None)
+    context.bot_data = {"db": db}
+
+    monkeypatch.setattr("handlers_common.safe_reply_text", AsyncMock())
+    monkeypatch.setattr("handlers_common.safe_delete_message", AsyncMock())
+    monkeypatch.setattr("handlers_common.show_main_reply_menu", AsyncMock())
+
+    result = await start(update, context)
+
+    assert result == RegistrationStates.waiting_for_contact
