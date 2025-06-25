@@ -184,3 +184,5 @@ async def test_process_comment_passes_filename(monkeypatch):
     await process_comment(update, context)
 
     assert tracker.upload_file.call_args.args[1] == "doc.txt"
+    sent_text = tracker.add_comment.call_args.args[1]
+    assert sent_text.endswith("\n---\n")
