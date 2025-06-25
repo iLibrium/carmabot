@@ -214,6 +214,33 @@ async def test_my_issues_unregistered():
 
 
 @pytest.mark.asyncio
+async def test_my_issues_clears_user_data(monkeypatch):
+    update = MagicMock()
+    msg = MagicMock()
+    update.message = msg
+    update.callback_query = None
+    update.effective_user = MagicMock(id=1)
+    msg.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {"tmp": "data"}
+    db = MagicMock()
+    db.get_user = AsyncMock(return_value={})
+    tracker = MagicMock()
+    tracker.get_active_issues_by_telegram_id = AsyncMock(return_value=[])
+    context.bot_data = {"db": db, "tracker": tracker}
+
+    monkeypatch.setattr(
+        sys.modules["handlers_issue"], "safe_delete_message", AsyncMock()
+    )
+
+    await my_issues(update, context)
+
+    assert context.user_data == {}
+    msg.reply_text.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_start_create_issue_unregistered():
     update = MagicMock()
     update.effective_user = MagicMock(id=1)
