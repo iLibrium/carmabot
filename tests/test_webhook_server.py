@@ -423,11 +423,11 @@ def test_download_attachment_sanitizes_filename(monkeypatch):
     mock_session.get.return_value = DummyResp(b"data")
     tracker.get_session = AsyncMock(return_value=mock_session)
 
-    captured_paths = []
+    captured = []
 
     class DummyInputFile:
         def __init__(self, path, filename=None):
-            captured_paths.append(path)
+            captured.append((path, filename))
 
     monkeypatch.setattr(sys.modules["webhook_server"], "InputFile", DummyInputFile)
 
@@ -447,10 +447,12 @@ def test_download_attachment_sanitizes_filename(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert captured_paths
-    basename = os.path.basename(captured_paths[0])
+    assert captured
+    path, fname = captured[0]
+    basename = os.path.basename(path)
     assert basename.endswith("_evil.txt")
-    assert not os.path.exists(captured_paths[0])
+    assert fname == "evil.txt"
+    assert not os.path.exists(path)
 
 
 def test_download_attachment_unique_paths(monkeypatch):
