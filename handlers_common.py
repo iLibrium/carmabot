@@ -25,6 +25,7 @@ from database import Database
 from keyboards import (
     main_reply_keyboard,
     contact_keyboard,
+    register_keyboard,
 )
 
 # Универсальная функция для вывода главного меню с reply-кнопками
@@ -69,7 +70,10 @@ async def show_user_info(update, context):
     user_id = update.effective_user.id
     user_info = await db.get_user(user_id)
     if not user_info:
-        await update.message.reply_text(NOT_REGISTERED)
+        await update.message.reply_text(
+            NOT_REGISTERED,
+            reply_markup=register_keyboard(),
+        )
         return
 
     full_name = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
@@ -141,3 +145,4 @@ def register_handlers(application):
     # --- (ОСТАЛЬНОЕ ОСТАВИТЬ для совместимости) ---
     application.add_handler(MessageHandler(filters.Regex("^🔄 Главное меню$"), main_menu))
     application.add_handler(MessageHandler(filters.Regex("^👤 Моя информация$"), show_user_info))
+    application.add_handler(MessageHandler(filters.Regex("^Зарегистрироваться$"), start))

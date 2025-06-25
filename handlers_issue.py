@@ -32,6 +32,7 @@ from database import Database
 from tracker_client import TrackerAPI
 from keyboards import (
     main_reply_keyboard,
+    register_keyboard,
 )
 from messages import (
     NO_ISSUES,
@@ -50,6 +51,7 @@ from messages import (
     COMMENT_PROMPT,
     NO_ISSUE_SELECTED,
     COMMENT_ADDED,
+    NOT_REGISTERED,
 )
 
 # ──────────────────────────── буфер медиа‑альбомов ─────────────────────────────
@@ -65,6 +67,22 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     logging.info("my_issues requested by %s", update.effective_user.id)
     telegram_id = update.effective_user.id
+    db: Database = context.bot_data["db"]
+    if not await db.get_user(telegram_id):
+        if update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.message.reply_text(
+                NOT_REGISTERED,
+                reply_markup=register_keyboard(),
+            )
+        elif update.message:
+            await update.message.reply_text(
+                NOT_REGISTERED,
+                reply_markup=register_keyboard(),
+            )
+            await safe_delete_message(update.message)
+        return
+
     tracker: TrackerAPI = context.bot_data["tracker"]
 
     issues = await tracker.get_active_issues_by_telegram_id(telegram_id)
@@ -100,6 +118,21 @@ from telegram.ext import ContextTypes
 async def start_create_issue(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Шаг 0 FSM: предлагаем ввести заголовок (работает с inline-кнопками и командами)."""
     logging.info("start_create_issue by %s", update.effective_user.id)
+    db: Database = context.bot_data["db"]
+    if not await db.get_user(update.effective_user.id):
+        if update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.message.reply_text(
+                NOT_REGISTERED,
+                reply_markup=register_keyboard(),
+            )
+        elif update.message:
+            await update.message.reply_text(
+                NOT_REGISTERED,
+                reply_markup=register_keyboard(),
+            )
+            await safe_delete_message(update.message)
+        return ConversationHandler.END
     markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")]
     ])
@@ -322,6 +355,14 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
 async def select_issue_for_comment(update: Update, context: CallbackContext):
     """Сохраняет выбранный `issue_key` и переводит FSM в режим ожидания комментария."""
     logging.info("select_issue_for_comment %s", update.callback_query.data)
+    db: Database = context.bot_data["db"]
+    if not await db.get_user(update.effective_user.id):
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text(
+            NOT_REGISTERED,
+            reply_markup=register_keyboard(),
+        )
+        return ConversationHandler.END
     query = update.callback_query
     issue_key = query.data.split("_", 1)[1]
     context.user_data["issue_key"] = issue_key

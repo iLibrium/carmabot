@@ -1,7 +1,7 @@
 import os
 import sys
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, ANY
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -12,8 +12,12 @@ from handlers_issue import (
     handle_attachment,
     _process_album_later,
     process_comment,
+    my_issues,
+    start_create_issue,
     _album_buffer,
 )
+from messages import NOT_REGISTERED
+from telegram.ext import ConversationHandler
 from config import Config
 
 @pytest.mark.asyncio
@@ -186,3 +190,46 @@ async def test_process_comment_passes_filename(monkeypatch):
     assert tracker.upload_file.call_args.args[1] == "doc.txt"
     sent_text = tracker.add_comment.call_args.args[1]
     assert sent_text.endswith("\n---\n")
+
+
+@pytest.mark.asyncio
+async def test_my_issues_unregistered():
+    update = MagicMock()
+    update.effective_user = MagicMock(id=1)
+    cbq = MagicMock()
+    cbq.answer = AsyncMock()
+    cbq.message.reply_text = AsyncMock()
+    update.callback_query = cbq
+
+    context = MagicMock()
+    db = MagicMock()
+    db.get_user = AsyncMock(return_value=None)
+    context.bot_data = {"db": db, "tracker": MagicMock()}
+
+    await my_issues(update, context)
+
+    cbq.message.reply_text.assert_called_once_with(
+        NOT_REGISTERED, reply_markup=ANY
+    )
+
+
+@pytest.mark.asyncio
+async def test_start_create_issue_unregistered():
+    update = MagicMock()
+    update.effective_user = MagicMock(id=1)
+    cbq = MagicMock()
+    cbq.answer = AsyncMock()
+    cbq.message.reply_text = AsyncMock()
+    update.callback_query = cbq
+
+    context = MagicMock()
+    db = MagicMock()
+    db.get_user = AsyncMock(return_value=None)
+    context.bot_data = {"db": db}
+
+    result = await start_create_issue(update, context)
+
+    assert result == ConversationHandler.END
+    cbq.message.reply_text.assert_called_once_with(
+        NOT_REGISTERED, reply_markup=ANY
+    )

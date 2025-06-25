@@ -61,3 +61,11 @@ def contact_keyboard() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
         one_time_keyboard=True,
     )
+
+def register_keyboard() -> ReplyKeyboardMarkup:
+    """Keyboard with a single button to restart registration."""
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton("Зарегистрироваться")]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
