@@ -118,6 +118,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                     logging.error(f"Ошибка загрузки файла {filename}: {resp.status}")
                     return None
                 file_bytes = await resp.read()
+                is_large = len(file_bytes) > 10 * 1024 * 1024
 
             safe_name = os.path.basename(filename)
             unique_name = f"{uuid.uuid4().hex}_{safe_name}"
@@ -126,7 +127,10 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                 f.write(file_bytes)
 
             telegram_file = InputFile(file_path, filename=safe_name)
-            if filename.lower().endswith((".jpg", ".png", ".jpeg")):
+            if (
+                filename.lower().endswith((".jpg", ".png", ".jpeg"))
+                and not is_large
+            ):
                 return ("photo", telegram_file, file_path)
             return ("document", telegram_file, file_path)
 

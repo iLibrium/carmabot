@@ -503,3 +503,36 @@ def test_download_attachment_unique_paths(monkeypatch):
     assert os.path.basename(path2).endswith("_same.txt")
     assert not os.path.exists(path1)
     assert not os.path.exists(path2)
+
+
+def test_large_photo_sent_as_document():
+    Config.API_TOKEN = "TOKEN"
+    application, tracker, bot = create_mocks()
+
+    tracker.get_attachments_for_comment = AsyncMock(
+        return_value=[{"content_url": "http://files/large.png", "filename": "large.png"}]
+    )
+
+    mock_session = MagicMock()
+    mock_session.get.return_value = DummyResp(b"x" * (10 * 1024 * 1024 + 1))
+    tracker.get_session = AsyncMock(return_value=mock_session)
+
+    app = create_app(application, tracker)
+    client = TestClient(app)
+
+    payload = {
+        "event": "commentCreated",
+        "issue": {"key": "ISSUE-1", "summary": "Test", "telegramId": "123"},
+        "comment": {"id": "1", "text": "hi"},
+    }
+
+    response = client.post(
+        "/trackers/comment",
+        json=payload,
+        headers={"Authorization": "Bearer TOKEN"},
+    )
+
+    assert response.status_code == 200
+    bot.send_document.assert_called_once()
+    bot.send_photo.assert_not_called()
+    bot.send_media_group.assert_not_called()
