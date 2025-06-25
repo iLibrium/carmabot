@@ -288,8 +288,7 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
         f"{description}\n\n---\n"
         f"👤 {user.first_name} {user.last_name or ''}\n"
         f"📞 {user_info.get('phone_number', 'неизвестно')}\n"
-        f"🔗 @{user.username or 'без username'}\n"
-        f"{description}\n\n---\n"
+        f"🔗 @{user.username or 'без username'}"
     )
 
     extra_fields = {
@@ -376,7 +375,7 @@ async def process_comment(update: Update, context: CallbackContext):
         f"👤 {user.first_name} {user.last_name or ''}\n"
         f"📞 {user_info.get('phone_number', 'неизвестно')}\n"
         f"🔗 @{user.username or 'без username'}\n"
-        "---\n"
+        f"{text}\n\n---\n"
     )
 
     await tracker.add_comment(issue_key, full_text, attachment_ids)
