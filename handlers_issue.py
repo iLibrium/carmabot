@@ -182,7 +182,7 @@ async def handle_attachment(update: Update, context: CallbackContext):
         temp_path = os.path.join("/tmp", filename)
 
         await file_info.download_to_drive(temp_path)
-        file_id = await tracker.upload_file(temp_path)
+        file_id = await tracker.upload_file(temp_path, getattr(file, "file_name", None))
         os.remove(temp_path)
 
         if not file_id:
@@ -246,7 +246,7 @@ async def _process_album_later(group_id: str, context: CallbackContext):
             filename = f"{file.file_unique_id}{ext}"
             temp_path = os.path.join("/tmp", filename)
             await file_info.download_to_drive(temp_path)
-            file_id = await tracker.upload_file(temp_path)
+            file_id = await tracker.upload_file(temp_path, getattr(file, "file_name", None))
             os.remove(temp_path)
             if file_id:
                 attachments.append(file_id)
@@ -359,7 +359,7 @@ async def process_comment(update: Update, context: CallbackContext):
             filename = f"{file.file_unique_id}{ext}"
             temp_path = os.path.join("/tmp", filename)
             await file_info.download_to_drive(temp_path)
-            file_id = await tracker.upload_file(temp_path)
+            file_id = await tracker.upload_file(temp_path, getattr(file, "file_name", None))
             os.remove(temp_path)
             if file_id:
                 attachment_ids.append(file_id)

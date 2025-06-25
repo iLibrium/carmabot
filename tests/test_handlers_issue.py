@@ -1,12 +1,19 @@
 import os
 import sys
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 import pytest
 
-from handlers_issue import confirm_issue_creation, handle_attachment
+from handlers_issue import (
+    confirm_issue_creation,
+    handle_attachment,
+    _process_album_later,
+    process_comment,
+    _album_buffer,
+)
 from config import Config
 
 @pytest.mark.asyncio
@@ -86,3 +93,94 @@ async def test_handle_attachment_document_extension(monkeypatch):
 
     upload_path = tracker.upload_file.call_args.args[0]
     assert upload_path.endswith(".pdf")
+    assert tracker.upload_file.call_args.args[1] == "file.pdf"
+
+
+@pytest.mark.asyncio
+async def test_process_album_later_passes_filename(monkeypatch):
+    msg = MagicMock()
+    file = MagicMock()
+    file.file_unique_id = "uid"
+    file.file_id = "fid"
+    file.file_name = "orig.jpg"
+    msg.photo = []
+    msg.document = file
+    msg.chat_id = 1
+    _album_buffer["gid"] = [msg]
+
+    file_info = MagicMock()
+
+    async def fake_download(path):
+        open(path, "wb").close()
+
+    file_info.download_to_drive = AsyncMock(side_effect=fake_download)
+
+    bot = MagicMock()
+    bot.get_file = AsyncMock(return_value=file_info)
+    bot.send_message = AsyncMock()
+
+    tracker = MagicMock()
+    tracker.upload_file = AsyncMock(return_value=1)
+
+    context = MagicMock()
+    context.bot = bot
+    context.bot_data = {"tracker": tracker}
+    context.user_data = {}
+
+    monkeypatch.setattr(asyncio, "sleep", AsyncMock())
+    monkeypatch.setattr(os, "remove", lambda *_: None)
+
+    await _process_album_later("gid", context)
+
+    assert tracker.upload_file.call_args.args[1] == "orig.jpg"
+
+
+@pytest.mark.asyncio
+async def test_process_comment_passes_filename(monkeypatch):
+    update = MagicMock()
+    message = MagicMock()
+    update.message = message
+    update.effective_user = MagicMock(
+        id=1, first_name="A", last_name="B", username="u"
+    )
+
+    doc = MagicMock()
+    doc.file_unique_id = "uid"
+    doc.file_id = "fid"
+    doc.file_name = "doc.txt"
+    message.document = doc
+    message.photo = []
+    message.text = None
+    message.caption = None
+
+    file_info = MagicMock()
+
+    async def fake_download(path):
+        open(path, "wb").close()
+
+    file_info.download_to_drive = AsyncMock(side_effect=fake_download)
+
+    bot = MagicMock()
+    bot.get_file = AsyncMock(return_value=file_info)
+
+    tracker = MagicMock()
+    tracker.upload_file = AsyncMock(return_value=1)
+    tracker.add_comment = AsyncMock()
+    tracker.get_issue_details = AsyncMock(return_value={"summary": "s"})
+
+    db = MagicMock()
+    db.get_user = AsyncMock(return_value={})
+
+    context = MagicMock()
+    context.bot = bot
+    context.bot_data = {"tracker": tracker, "db": db}
+    context.user_data = {"issue_key": "ISSUE-1"}
+
+    monkeypatch.setattr(os, "remove", lambda *_: None)
+    monkeypatch.setattr(
+        sys.modules["handlers_issue"], "safe_reply_text", AsyncMock()
+    )
+
+    await process_comment(update, context)
+
+    assert tracker.upload_file.call_args.args[1] == "doc.txt"
