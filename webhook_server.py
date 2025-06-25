@@ -125,7 +125,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
             with open(file_path, "wb") as f:
                 f.write(file_bytes)
 
-            telegram_file = InputFile(file_path, filename=filename)
+            telegram_file = InputFile(file_path, filename=safe_name)
             if filename.lower().endswith((".jpg", ".png", ".jpeg")):
                 return ("photo", telegram_file, file_path)
             return ("document", telegram_file, file_path)
