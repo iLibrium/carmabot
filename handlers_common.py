@@ -145,4 +145,4 @@ def register_handlers(application):
     # --- (ОСТАЛЬНОЕ ОСТАВИТЬ для совместимости) ---
     application.add_handler(MessageHandler(filters.Regex("^🔄 Главное меню$"), main_menu))
     application.add_handler(MessageHandler(filters.Regex("^👤 Моя информация$"), show_user_info))
-    application.add_handler(MessageHandler(filters.Regex("^Зарегистрироваться$"), start))
+    application.add_handler(MessageHandler(filters.Regex("^📝 Зарегистрироваться$"), start))
