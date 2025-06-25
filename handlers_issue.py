@@ -102,6 +102,7 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.callback_query.edit_message_text(NO_ISSUES, reply_markup=markup)
         elif update.message:
             await update.message.reply_text(NO_ISSUES, reply_markup=markup)
+        if update.message:
             await safe_delete_message(update.message)
         return
 
@@ -110,6 +111,7 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.callback_query.edit_message_text(ISSUES_LIST, reply_markup=markup)
     elif update.message:
         await update.message.reply_text(ISSUES_LIST, reply_markup=markup)
+    if update.message:
         await safe_delete_message(update.message)
 
 # ═══════════════════════════ создание задачи (FSM) ════════════════════════════
