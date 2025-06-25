@@ -105,7 +105,8 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                     return None
                 file_bytes = await resp.read()
 
-            file_path = os.path.join("/tmp", filename)
+            safe_name = os.path.basename(filename)
+            file_path = os.path.join("/tmp", safe_name)
             with open(file_path, "wb") as f:
                 f.write(file_bytes)
 
