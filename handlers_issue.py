@@ -174,7 +174,11 @@ async def handle_attachment(update: Update, context: CallbackContext):
 
     try:
         file_info = await context.bot.get_file(file.file_id)
-        filename = f"{file.file_unique_id}.jpg"
+        if getattr(file, "file_name", None):
+            ext = os.path.splitext(file.file_name)[1] or ".jpg"
+        else:
+            ext = ".jpg"
+        filename = f"{file.file_unique_id}{ext}"
         temp_path = os.path.join("/tmp", filename)
 
         await file_info.download_to_drive(temp_path)
@@ -235,7 +239,11 @@ async def _process_album_later(group_id: str, context: CallbackContext):
             continue
         try:
             file_info = await context.bot.get_file(file.file_id)
-            filename = f"{file.file_unique_id}.jpg"
+            if getattr(file, "file_name", None):
+                ext = os.path.splitext(file.file_name)[1] or ".jpg"
+            else:
+                ext = ".jpg"
+            filename = f"{file.file_unique_id}{ext}"
             temp_path = os.path.join("/tmp", filename)
             await file_info.download_to_drive(temp_path)
             file_id = await tracker.upload_file(temp_path)
@@ -344,7 +352,11 @@ async def process_comment(update: Update, context: CallbackContext):
         file = update.message.document or update.message.photo[-1]
         try:
             file_info = await context.bot.get_file(file.file_id)
-            filename = f"{file.file_unique_id}.jpg"
+            if getattr(file, "file_name", None):
+                ext = os.path.splitext(file.file_name)[1] or ".jpg"
+            else:
+                ext = ".jpg"
+            filename = f"{file.file_unique_id}{ext}"
             temp_path = os.path.join("/tmp", filename)
             await file_info.download_to_drive(temp_path)
             file_id = await tracker.upload_file(temp_path)
