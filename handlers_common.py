@@ -35,12 +35,14 @@ async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.callback_query.answer()
         await update.callback_query.message.reply_text(
             MAIN_MENU,
-            reply_markup=main_reply_keyboard()
+            reply_markup=main_reply_keyboard(),
+            parse_mode="HTML",
         )
     elif update.message:
         await update.message.reply_text(
             MAIN_MENU,
-            reply_markup=main_reply_keyboard()
+            reply_markup=main_reply_keyboard(),
+            parse_mode="HTML",
         )
         await safe_delete_message(update.message)
 
@@ -117,12 +119,14 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.edit_message_reply_markup(reply_markup=None)
         await update.callback_query.message.reply_text(
             MAIN_MENU,
-            reply_markup=main_reply_keyboard()
+            reply_markup=main_reply_keyboard(),
+            parse_mode="HTML",
         )
     elif update.message:
         await update.message.reply_text(
             MAIN_MENU,
-            reply_markup=main_reply_keyboard()
+            reply_markup=main_reply_keyboard(),
+            parse_mode="HTML",
         )
 
 def register_handlers(application):
