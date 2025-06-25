@@ -129,7 +129,7 @@ def register_handlers(application):
     registration_conv = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
-            MessageHandler(filters.Regex("^Зарегистрироваться$"), start),
+            MessageHandler(filters.Regex("^📝 Зарегистрироваться$"), start),
         ],
         states={
             RegistrationStates.waiting_for_contact: [
