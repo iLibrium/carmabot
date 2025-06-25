@@ -46,3 +46,28 @@ Install test dependencies (already included in `requirements.txt`) and run:
 pytest
 ```
 
+## Sending and receiving attachments
+
+To attach files when creating a comment you must first upload them to Tracker.
+Send each file to `/v2/attachments` and pass the returned IDs in the
+`attachmentIds` field when calling `/v2/issues/{key}/comments`.
+
+When receiving webhooks the bot downloads attachments by calling
+`/v2/issues/{key}/comments/{id}?expand=attachments`.
+Images up to 10&nbsp;MB are sent using `sendPhoto`. Larger files or images that
+Telegram fails to process are delivered with `sendDocument`.
+
+Example payload for the webhook endpoint:
+
+```json
+{
+  "event": "commentCreated",
+  "issue": {"key": "ISSUE-1", "summary": "Test", "telegramId": "123"},
+  "comment": {
+    "id": "1",
+    "text": "hi",
+    "createdBy": {"display": "Tester"}
+  }
+}
+```
+
