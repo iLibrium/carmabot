@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
 import asyncio
 import re
+import time
 from telegram import InputMediaPhoto, InputFile, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
 from messages import WEBHOOK_COMMENT, WEBHOOK_STATUS
@@ -16,8 +17,18 @@ app = FastAPI()
 router = APIRouter()
 bearer_scheme = HTTPBearer()
 
-# In-memory store of processed comment IDs to prevent duplicates
-processed_comment_ids: set[str] = set()
+# In-memory store of processed comment IDs with timestamp to prevent duplicates
+processed_comment_ids: dict[str, float] = {}
+# Time-to-live for stored comment IDs in seconds
+PROCESSED_IDS_TTL = 3600
+
+
+def prune_processed_ids() -> None:
+    """Remove expired comment IDs from the cache."""
+    now = time.time()
+    expired = [cid for cid, ts in processed_comment_ids.items() if now - ts > PROCESSED_IDS_TTL]
+    for cid in expired:
+        processed_comment_ids.pop(cid, None)
 
 # Regex to strip markdown image links like ![alt](url)
 IMAGE_LINK_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
@@ -52,11 +63,13 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         comment_id = comment_data.get("id")
         issue_summary = issue.get("summary", "Нет темы")
 
-        if comment_id and comment_id in processed_comment_ids:
+        prune_processed_ids()
+
+        if comment_id and str(comment_id) in processed_comment_ids:
             logging.info("Duplicate comment %s ignored", comment_id)
             return {"status": "ignored"}
         if comment_id:
-            processed_comment_ids.add(str(comment_id))
+            processed_comment_ids[str(comment_id)] = time.time()
 
         telegram_id = issue.get("telegramId")
 

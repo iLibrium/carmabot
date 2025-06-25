@@ -7,7 +7,12 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from webhook_server import setup_webhook_routes, router, processed_comment_ids
+from webhook_server import (
+    setup_webhook_routes,
+    router,
+    processed_comment_ids,
+    PROCESSED_IDS_TTL,
+)
 from config import Config
 
 
@@ -360,6 +365,50 @@ def test_receive_webhook_deduplicates_comment():
     assert response1.status_code == 200
     assert response2.status_code == 200
     bot.send_message.assert_called_once()
+
+
+def test_receive_webhook_dedup_expires(monkeypatch):
+    Config.API_TOKEN = "TOKEN"
+    application, tracker, bot = create_mocks()
+
+    tracker.get_attachments_for_comment = AsyncMock(return_value=[])
+    mock_session = MagicMock()
+    mock_session.get.return_value = DummyResp()
+    tracker.get_session = AsyncMock(return_value=mock_session)
+
+    app = create_app(application, tracker)
+    client = TestClient(app)
+
+    monkeypatch.setattr(sys.modules["webhook_server"], "PROCESSED_IDS_TTL", 1)
+
+    current = {"t": 0}
+
+    def fake_time():
+        return current["t"]
+
+    monkeypatch.setattr(sys.modules["webhook_server"].time, "time", fake_time)
+
+    payload = {
+        "event": "commentCreated",
+        "issue": {"key": "ISSUE-1", "summary": "Test", "telegramId": "123"},
+        "comment": {"id": "1", "text": "hi"},
+    }
+
+    response1 = client.post(
+        "/trackers/comment",
+        json=payload,
+        headers={"Authorization": "Bearer TOKEN"},
+    )
+    current["t"] = 2
+    response2 = client.post(
+        "/trackers/comment",
+        json=payload,
+        headers={"Authorization": "Bearer TOKEN"},
+    )
+
+    assert response1.status_code == 200
+    assert response2.status_code == 200
+    assert bot.send_message.call_count == 2
 
 
 def test_download_attachment_sanitizes_filename(monkeypatch):
