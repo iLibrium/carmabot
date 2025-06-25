@@ -583,3 +583,38 @@ def test_send_document_failure_removes_file(monkeypatch):
     file_obj = captured[0]
     assert file_obj.closed
     assert not os.path.exists(file_obj.name)
+
+
+def test_attachments_sent_before_message():
+    Config.API_TOKEN = "TOKEN"
+    application, tracker, bot = create_mocks()
+
+    tracker.get_attachments_for_comment = AsyncMock(
+        return_value=[{"content_url": "http://files/doc.txt", "filename": "doc.txt"}]
+    )
+
+    mock_session = MagicMock()
+    mock_session.get.return_value = DummyResp(b"data")
+    tracker.get_session = AsyncMock(return_value=mock_session)
+
+    app = create_app(application, tracker)
+    client = TestClient(app)
+
+    payload = {
+        "event": "commentCreated",
+        "issue": {"key": "ISSUE-1", "summary": "Test", "telegramId": "123"},
+        "comment": {"id": "1", "text": "hi"},
+    }
+
+    response = client.post(
+        "/trackers/comment",
+        json=payload,
+        headers={"Authorization": "Bearer TOKEN"},
+    )
+
+    assert response.status_code == 200
+
+    calls = [c[0] for c in bot.mock_calls]
+    assert calls[0] == "send_document"
+    assert "send_message" in calls
+    assert calls.index("send_document") < calls.index("send_message")

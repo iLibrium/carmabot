@@ -158,13 +158,6 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         )
 
         try:
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text=message_text,
-                parse_mode="HTML",
-                reply_markup=reply_markup,
-            )
-
             if media_photos:
                 tg_photos = [InputMediaPhoto(media=file) for file, _, _ in media_photos]
                 try:
@@ -216,6 +209,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                                     path,
                                     exc,
                                 )
+
             for doc, path, handle in documents:
                 try:
                     await application.bot.send_document(chat_id, doc)
@@ -230,6 +224,13 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                             path,
                             exc,
                         )
+
+            await application.bot.send_message(
+                chat_id=chat_id,
+                text=message_text,
+                parse_mode="HTML",
+                reply_markup=reply_markup,
+            )
 
         except Exception as e:
             logging.error(f"❌ Ошибка при отправке сообщений в Telegram: {e}")
