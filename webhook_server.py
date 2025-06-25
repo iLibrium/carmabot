@@ -72,6 +72,8 @@ def strip_signature(text: str) -> str:
 
 def sanitize_comment_text(text: str) -> str:
     """Apply basic cleanup to a Tracker comment."""
+    # convert HTML non-breaking space entities and unicode NBSP to regular spaces
+    text = text.replace("\xa0", " ").replace("&nbsp;", " ")
     text = strip_image_links(text)
     text = strip_reply_prefix(text)
     text = strip_signature(text)

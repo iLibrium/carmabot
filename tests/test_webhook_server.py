@@ -399,6 +399,36 @@ def test_receive_webhook_strips_reply_metadata():
     assert "Reply" in sent_text
 
 
+def test_receive_webhook_converts_nbsp():
+    Config.API_TOKEN = "TOKEN"
+    application, tracker, bot = create_mocks()
+
+    tracker.get_attachments_for_comment = AsyncMock(return_value=[])
+    mock_session = MagicMock()
+    mock_session.get.return_value = DummyResp()
+    tracker.get_session = AsyncMock(return_value=mock_session)
+
+    app = create_app(application, tracker)
+    client = TestClient(app)
+
+    payload = {
+        "event": "commentCreated",
+        "issue": {"key": "ISSUE-1", "summary": "Test", "telegramId": "123"},
+        "comment": {"id": "1", "text": "Hello\xa0World &nbsp;!"},
+    }
+
+    response = client.post(
+        "/trackers/comment",
+        json=payload,
+        headers={"Authorization": "Bearer TOKEN"},
+    )
+
+    assert response.status_code == 200
+    sent_text = bot.send_message.call_args.kwargs["text"]
+    assert "\xa0" not in sent_text
+    assert "&nbsp;" not in sent_text
+
+
 def test_receive_webhook_deduplicates_comment():
     Config.API_TOKEN = "TOKEN"
     application, tracker, bot = create_mocks()
