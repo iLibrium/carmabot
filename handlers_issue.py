@@ -66,6 +66,8 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     Функция работает и для inline-кнопок, и для текстовой команды.
     """
     logging.info("my_issues requested by %s", update.effective_user.id)
+    # Сбрасываем временные данные, если пользователь прервал создание задачи
+    context.user_data.clear()
     telegram_id = update.effective_user.id
     db: Database = context.bot_data["db"]
     if not await db.get_user(telegram_id):
