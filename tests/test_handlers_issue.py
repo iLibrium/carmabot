@@ -230,14 +230,16 @@ async def test_my_issues_clears_user_data(monkeypatch):
     tracker.get_active_issues_by_telegram_id = AsyncMock(return_value=[])
     context.bot_data = {"db": db, "tracker": tracker}
 
+    delete_mock = AsyncMock()
     monkeypatch.setattr(
-        sys.modules["handlers_issue"], "safe_delete_message", AsyncMock()
+        sys.modules["handlers_issue"], "safe_delete_message", delete_mock
     )
 
     await my_issues(update, context)
 
     assert context.user_data == {}
     msg.reply_text.assert_called_once()
+    delete_mock.assert_called_once_with(msg)
 
 
 @pytest.mark.asyncio
