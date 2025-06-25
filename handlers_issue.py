@@ -375,7 +375,7 @@ async def process_comment(update: Update, context: CallbackContext):
         f"👤 {user.first_name} {user.last_name or ''}\n"
         f"📞 {user_info.get('phone_number', 'неизвестно')}\n"
         f"🔗 @{user.username or 'без username'}\n"
-        f"{text}\n\n---\n"
+        f"\n\n---\n"
     )
 
     await tracker.add_comment(issue_key, full_text, attachment_ids)
