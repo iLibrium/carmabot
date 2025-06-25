@@ -126,23 +126,24 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
             with open(file_path, "wb") as f:
                 f.write(file_bytes)
 
-            telegram_file = InputFile(file_path, filename=safe_name)
+            file_handle = open(file_path, "rb")
+            telegram_file = InputFile(file_handle, filename=safe_name)
             if (
                 filename.lower().endswith((".jpg", ".png", ".jpeg"))
                 and not is_large
             ):
-                return ("photo", telegram_file, file_path)
-            return ("document", telegram_file, file_path)
+                return ("photo", telegram_file, file_path, file_handle)
+            return ("document", telegram_file, file_path, file_handle)
 
         download_results = await asyncio.gather(*(download_attachment(att) for att in attachments))
         for result in download_results:
             if not result:
                 continue
-            kind, tg_file, file_path = result
+            kind, tg_file, file_path, handle = result
             if kind == "photo":
-                media_photos.append((tg_file, file_path))
+                media_photos.append((tg_file, file_path, handle))
             else:
-                documents.append((tg_file, file_path))
+                documents.append((tg_file, file_path, handle))
         
         clean_text = strip_image_links(comment_data.get("text", ""))
         message_text = WEBHOOK_COMMENT.format(
@@ -165,7 +166,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
             )
 
             if media_photos:
-                tg_photos = [InputMediaPhoto(media=file) for file, _ in media_photos]
+                tg_photos = [InputMediaPhoto(media=file) for file, _, _ in media_photos]
                 try:
                     if len(tg_photos) > 1:
                         await application.bot.send_media_group(chat_id, tg_photos)
@@ -186,10 +187,12 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                             exc,
                         )
 
-                        for doc, path in media_photos:
+                        for doc, path, handle in media_photos:
                             try:
                                 await application.bot.send_document(chat_id, doc)
                             finally:
+                                if not handle.closed:
+                                    handle.close()
                                 try:
                                     os.remove(path)
                                 except OSError as exc:
@@ -201,7 +204,9 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                     else:
                         raise
                 finally:
-                    for _, path in media_photos:
+                    for _, path, handle in media_photos:
+                        if not handle.closed:
+                            handle.close()
                         if os.path.exists(path):
                             try:
                                 os.remove(path)
@@ -211,10 +216,12 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
                                     path,
                                     exc,
                                 )
-            for doc, path in documents:
+            for doc, path, handle in documents:
                 try:
                     await application.bot.send_document(chat_id, doc)
                 finally:
+                    if not handle.closed:
+                        handle.close()
                     try:
                         os.remove(path)
                     except OSError as exc:
