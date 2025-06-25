@@ -35,6 +35,9 @@ def prune_processed_ids() -> None:
 IMAGE_LINK_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 # Regex to strip Tracker file links like :file[name](url){type="..."}
 FILE_LINK_RE = re.compile(r":file\[[^\]]*\]\([^)]*\)(?:\{[^}]*\})?")
+# Regex to remove signature lines appended by the bot
+SIGNATURE_RE = re.compile(r"\n?---\n👤.*", re.DOTALL)
+
 
 def strip_image_links(text: str) -> str:
     """Remove markdown image and file links from text."""
@@ -44,6 +47,28 @@ def strip_image_links(text: str) -> str:
     cleaned = FILE_LINK_RE.sub("", cleaned)
     cleaned = re.sub(r"\s{2,}", " ", cleaned)
     return cleaned.strip()
+
+def strip_reply_prefix(text: str) -> str:
+    """Remove quoted reply prefix from a comment."""
+    if not text:
+        return ""
+    lines = text.splitlines()
+    while lines and lines[0].lstrip().startswith(">"):
+        lines.pop(0)
+    return "\n".join(lines).lstrip()
+
+def strip_signature(text: str) -> str:
+    """Remove user signature appended by the bot."""
+    if not text:
+        return ""
+    return SIGNATURE_RE.sub("", text).strip()
+
+def sanitize_comment_text(text: str) -> str:
+    """Apply all text cleanups to a Tracker comment."""
+    text = strip_image_links(text)
+    text = strip_reply_prefix(text)
+    text = strip_signature(text)
+    return text
 
 def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
     """Настраивает маршруты вебхуков"""
@@ -148,7 +173,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
             else:
                 documents.append((tg_file, file_path, handle))
         
-        clean_text = strip_image_links(comment_data.get("text", ""))
+        clean_text = sanitize_comment_text(comment_data.get("text", ""))
         message_text = WEBHOOK_COMMENT.format(
             issue_key=issue_key,
             issue_summary=issue_summary,
