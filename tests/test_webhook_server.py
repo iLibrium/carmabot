@@ -366,7 +366,7 @@ def test_receive_webhook_strips_file_links():
     assert "Hello" in sent_text
 
 
-def test_receive_webhook_strips_reply_metadata():
+def test_receive_webhook_preserves_reply_metadata():
     Config.API_TOKEN = "TOKEN"
     application, tracker, bot = create_mocks()
 
@@ -394,8 +394,8 @@ def test_receive_webhook_strips_reply_metadata():
 
     assert response.status_code == 200
     sent_text = bot.send_message.call_args.kwargs["text"]
-    assert "\u0412 \u043e\u0442\u0432\u0435\u0442" not in sent_text  # "В ответ"
-    assert "\ud83d\udc64" not in sent_text  # signature icon
+    assert "\u0412 \u043e\u0442\u0432\u0435\u0442" in sent_text  # "В ответ"
+    assert "\ud83d\udc64" in sent_text  # signature icon
     assert "Reply" in sent_text
 
 

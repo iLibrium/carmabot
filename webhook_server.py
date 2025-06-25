@@ -64,11 +64,8 @@ def strip_signature(text: str) -> str:
     return SIGNATURE_RE.sub("", text).strip()
 
 def sanitize_comment_text(text: str) -> str:
-    """Apply all text cleanups to a Tracker comment."""
-    text = strip_image_links(text)
-    text = strip_reply_prefix(text)
-    text = strip_signature(text)
-    return text
+    """Apply basic cleanup to a Tracker comment."""
+    return strip_image_links(text)
 
 def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
     """Настраивает маршруты вебхуков"""
