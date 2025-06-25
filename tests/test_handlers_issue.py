@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 import pytest
 
-from handlers_issue import confirm_issue_creation
+from handlers_issue import confirm_issue_creation, handle_attachment
 from config import Config
 
 @pytest.mark.asyncio
@@ -44,3 +44,45 @@ async def test_confirm_issue_creation_extra_fields():
     assert extra["tags"] == Config.DEFAULT_TAGS
     assert extra["attachmentIds"] == [123]
     assert extra[Config.PRODUCT_CUSTOM_FIELD] == Config.PRODUCT_DEFAULT
+
+
+@pytest.mark.asyncio
+async def test_handle_attachment_document_extension(monkeypatch):
+    update = MagicMock()
+    message = MagicMock()
+    update.message = message
+    update.effective_user = MagicMock(id=1)
+
+    document = MagicMock()
+    document.file_unique_id = "uid"
+    document.file_id = "fid"
+    document.file_name = "file.pdf"
+    message.document = document
+    message.photo = []
+    message.reply_text = AsyncMock()
+
+    file_info = MagicMock()
+
+    async def fake_download(path):
+        # create dummy file so os.remove doesn't fail if called
+        open(path, "wb").close()
+
+    file_info.download_to_drive = AsyncMock(side_effect=fake_download)
+
+    bot = MagicMock()
+    bot.get_file = AsyncMock(return_value=file_info)
+
+    tracker = MagicMock()
+    tracker.upload_file = AsyncMock(return_value=1)
+
+    context = MagicMock()
+    context.bot = bot
+    context.bot_data = {"tracker": tracker}
+    context.user_data = {}
+
+    monkeypatch.setattr(os, "remove", lambda *_: None)
+
+    await handle_attachment(update, context)
+
+    upload_path = tracker.upload_file.call_args.args[0]
+    assert upload_path.endswith(".pdf")
