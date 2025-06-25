@@ -33,12 +33,15 @@ def prune_processed_ids() -> None:
 
 # Regex to strip markdown image links like ![alt](url)
 IMAGE_LINK_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+# Regex to strip Tracker file links like :file[name](url){type="..."}
+FILE_LINK_RE = re.compile(r":file\[[^\]]*\]\([^)]*\)(?:\{[^}]*\})?")
 
 def strip_image_links(text: str) -> str:
-    """Remove markdown image links from text."""
+    """Remove markdown image and file links from text."""
     if not text:
         return ""
     cleaned = IMAGE_LINK_RE.sub("", text)
+    cleaned = FILE_LINK_RE.sub("", cleaned)
     cleaned = re.sub(r"\s{2,}", " ", cleaned)
     return cleaned.strip()
 
