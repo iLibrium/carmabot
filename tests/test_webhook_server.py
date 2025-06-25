@@ -426,8 +426,8 @@ def test_download_attachment_sanitizes_filename(monkeypatch):
     captured = []
 
     class DummyInputFile:
-        def __init__(self, path, filename=None):
-            captured.append((path, filename))
+        def __init__(self, file_obj, filename=None):
+            captured.append((file_obj, filename))
 
     monkeypatch.setattr(sys.modules["webhook_server"], "InputFile", DummyInputFile)
 
@@ -448,11 +448,12 @@ def test_download_attachment_sanitizes_filename(monkeypatch):
 
     assert response.status_code == 200
     assert captured
-    path, fname = captured[0]
-    basename = os.path.basename(path)
+    file_obj, fname = captured[0]
+    basename = os.path.basename(file_obj.name)
     assert basename.endswith("_evil.txt")
     assert fname == "evil.txt"
-    assert not os.path.exists(path)
+    assert file_obj.closed
+    assert not os.path.exists(file_obj.name)
 
 
 def test_download_attachment_unique_paths(monkeypatch):
@@ -473,8 +474,8 @@ def test_download_attachment_unique_paths(monkeypatch):
     captured = []
 
     class DummyInputFile:
-        def __init__(self, path, filename=None):
-            captured.append((path, filename))
+        def __init__(self, file_obj, filename=None):
+            captured.append((file_obj, filename))
 
     monkeypatch.setattr(sys.modules["webhook_server"], "InputFile", DummyInputFile)
 
@@ -495,14 +496,15 @@ def test_download_attachment_unique_paths(monkeypatch):
 
     assert response.status_code == 200
     assert len(captured) == 2
-    path1, fname1 = captured[0]
-    path2, fname2 = captured[1]
-    assert path1 != path2
+    file1, fname1 = captured[0]
+    file2, fname2 = captured[1]
+    assert file1.name != file2.name
     assert fname1 == fname2 == "same.txt"
-    assert os.path.basename(path1).endswith("_same.txt")
-    assert os.path.basename(path2).endswith("_same.txt")
-    assert not os.path.exists(path1)
-    assert not os.path.exists(path2)
+    assert os.path.basename(file1.name).endswith("_same.txt")
+    assert os.path.basename(file2.name).endswith("_same.txt")
+    assert file1.closed and file2.closed
+    assert not os.path.exists(file1.name)
+    assert not os.path.exists(file2.name)
 
 
 def test_large_photo_sent_as_document():
@@ -553,8 +555,8 @@ def test_send_document_failure_removes_file(monkeypatch):
     captured = []
 
     class DummyInputFile:
-        def __init__(self, path, filename=None):
-            captured.append(path)
+        def __init__(self, file_obj, filename=None):
+            captured.append(file_obj)
 
     monkeypatch.setattr(sys.modules["webhook_server"], "InputFile", DummyInputFile)
 
@@ -578,5 +580,6 @@ def test_send_document_failure_removes_file(monkeypatch):
     assert response.status_code == 200
     bot.send_document.assert_called_once()
     assert captured
-    path = captured[0]
-    assert not os.path.exists(path)
+    file_obj = captured[0]
+    assert file_obj.closed
+    assert not os.path.exists(file_obj.name)
