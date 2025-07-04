@@ -24,8 +24,7 @@ FILE_TOO_LARGE = "❌ Размер файла превышает 50МБ."
 ALBUM_FILE_FAILED = "❌ Не удалось загрузить одно из фото. Отправьте альбом снова."
 
 ISSUE_CREATED = (
-    "✅ Задача {issue_key} (https://tracker.yandex.ru/{issue_key}) успешно создана!\n"
-    "<b>Наименование:</b> {summary}"
+    "✅ Задача <a href='https://tracker.yandex.ru/{issue_key}'>{summary}</a> успешно создана!"
 )
 ISSUE_CREATION_ERROR = "❌ Ошибка при создании задачи. Попробуйте позже."
 
