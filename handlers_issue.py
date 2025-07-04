@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import html
+import time
 from collections import defaultdict
 from typing import Final, List, Dict
 from telegram.ext import ContextTypes, CallbackContext
@@ -53,6 +54,7 @@ from messages import (
     NO_ISSUE_SELECTED,
     COMMENT_ADDED,
     NOT_REGISTERED,
+    REQUEST_PENDING,
 )
 
 # ──────────────────────────── буфер медиа‑альбомов ─────────────────────────────
@@ -338,6 +340,16 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
     """Создаёт задачу в Tracker и сохраняет её в БД."""
     logging.info("confirm_issue_creation by %s", update.effective_user.id)
     query = update.callback_query
+
+    now = time.time()
+    last_time = context.user_data.get("_create_issue_ts")
+    if last_time and now - last_time < 10:
+        await query.answer(
+            text=REQUEST_PENDING.format(action="создание задачи"),
+            show_alert=True,
+        )
+        return IssueStates.waiting_for_attachment
+    context.user_data["_create_issue_ts"] = now
     await query.answer()
 
     db: Database = context.bot_data["db"]
@@ -400,6 +412,17 @@ async def select_issue_for_comment(update: Update, context: CallbackContext):
         )
         return ConversationHandler.END
     query = update.callback_query
+
+    now = time.time()
+    last_time = context.user_data.get("_comment_request_ts")
+    if last_time and now - last_time < 10:
+        await query.answer(
+            text=REQUEST_PENDING.format(action="добавление комментария"),
+            show_alert=True,
+        )
+        return ConversationHandler.END
+    context.user_data["_comment_request_ts"] = now
+
     issue_key = query.data.split("_", 1)[1]
     context.user_data["issue_key"] = issue_key
     msg = context.user_data.pop("issues_list_message", None)
