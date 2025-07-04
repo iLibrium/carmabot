@@ -39,6 +39,9 @@ async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode="HTML",
         )
     elif update.message:
+        msg = context.user_data.pop("issues_list_message", None)
+        if msg:
+            await safe_delete_message(msg)
         await update.message.reply_text(
             MAIN_MENU,
             reply_markup=main_reply_keyboard(),
@@ -117,12 +120,18 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.edit_message_reply_markup(reply_markup=None)
+        msg = context.user_data.pop("issues_list_message", None)
+        if msg:
+            await safe_delete_message(msg)
         await update.callback_query.message.reply_text(
             MAIN_MENU,
             reply_markup=main_reply_keyboard(),
             parse_mode="HTML",
         )
     elif update.message:
+        msg = context.user_data.pop("issues_list_message", None)
+        if msg:
+            await safe_delete_message(msg)
         await update.message.reply_text(
             MAIN_MENU,
             reply_markup=main_reply_keyboard(),

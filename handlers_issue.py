@@ -109,8 +109,10 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.edit_message_text(ISSUES_LIST, reply_markup=markup)
+        context.user_data["issues_list_message"] = update.callback_query.message
     elif update.message:
-        await update.message.reply_text(ISSUES_LIST, reply_markup=markup)
+        sent = await update.message.reply_text(ISSUES_LIST, reply_markup=markup)
+        context.user_data["issues_list_message"] = sent
     if update.message:
         await safe_delete_message(update.message)
 
@@ -370,6 +372,9 @@ async def select_issue_for_comment(update: Update, context: CallbackContext):
     query = update.callback_query
     issue_key = query.data.split("_", 1)[1]
     context.user_data["issue_key"] = issue_key
+    msg = context.user_data.pop("issues_list_message", None)
+    if msg:
+        await safe_delete_message(msg)
     await query.message.reply_text(
         COMMENT_PROMPT,
         reply_markup=InlineKeyboardMarkup(
