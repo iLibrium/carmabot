@@ -33,19 +33,23 @@ async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYP
     logging.info("show_main_reply_menu triggered by %s", update.effective_user.id)
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.message.reply_text(
+        await safe_reply_text(
+            update.callback_query.message,
             MAIN_MENU,
             reply_markup=main_reply_keyboard(),
             parse_mode="HTML",
+            context=context,
         )
     elif update.message:
         msg = context.user_data.pop("issues_list_message", None)
         if msg:
             await safe_delete_message(msg)
-        await update.message.reply_text(
+        await safe_reply_text(
+            update.message,
             MAIN_MENU,
             reply_markup=main_reply_keyboard(),
             parse_mode="HTML",
+            context=context,
         )
         await safe_delete_message(update.message)
 
@@ -65,6 +69,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update.message,
             REQUEST_CONTACT,
             reply_markup=contact_keyboard(),
+            context=context,
         )
         await safe_delete_message(update.message)
     return RegistrationStates.waiting_for_contact
@@ -75,21 +80,25 @@ async def show_user_info(update, context):
     user_id = update.effective_user.id
     user_info = await db.get_user(user_id)
     if not user_info:
-        await update.message.reply_text(
+        await safe_reply_text(
+            update.message,
             NOT_REGISTERED,
             reply_markup=register_keyboard(),
+            context=context,
         )
         return
 
     full_name = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
     phone = user_info.get("phone_number", "Нет данных")
 
-    await update.message.reply_text(
+    await safe_reply_text(
+        update.message,
         f"👤 <b>Ваши данные:</b>\n"
         f"Имя: {full_name}\n"
         f"Телефон: {phone}\n"
         f"Telegram: @{update.effective_user.username or 'Нет'}",
-        parse_mode="HTML"
+        parse_mode="HTML",
+        context=context,
     )
     await safe_delete_message(update.message)
 
@@ -108,7 +117,7 @@ async def process_contact(update: Update, context: CallbackContext):
         contact.phone_number,
     )
 
-    await safe_reply_text(update.message, REGISTRATION_SUCCESS)
+    await safe_reply_text(update.message, REGISTRATION_SUCCESS, context=context)
     await show_main_reply_menu(update, context)
     return ConversationHandler.END
 
@@ -123,19 +132,23 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = context.user_data.pop("issues_list_message", None)
         if msg:
             await safe_delete_message(msg)
-        await update.callback_query.message.reply_text(
+        await safe_reply_text(
+            update.callback_query.message,
             MAIN_MENU,
             reply_markup=main_reply_keyboard(),
             parse_mode="HTML",
+            context=context,
         )
     elif update.message:
         msg = context.user_data.pop("issues_list_message", None)
         if msg:
             await safe_delete_message(msg)
-        await update.message.reply_text(
+        await safe_reply_text(
+            update.message,
             MAIN_MENU,
             reply_markup=main_reply_keyboard(),
             parse_mode="HTML",
+            context=context,
         )
 
 def register_handlers(application):
