@@ -101,6 +101,7 @@ async def test_get_active_issues_filters_statuses():
         {'key': 'ISSUE-1', 'status': {'key': 'open'}},
         {'key': 'ISSUE-2', 'status': {'key': 'closed'}},
         {'key': 'ISSUE-3', 'status': {'key': 'canceled'}},
+        {'key': 'ISSUE-4', 'status': {'key': 'done'}},
     ])
     api.get_session = AsyncMock(return_value=mock_session)
 
