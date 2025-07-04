@@ -24,8 +24,8 @@ FILE_TOO_LARGE = "❌ Размер файла превышает 50МБ."
 ALBUM_FILE_FAILED = "❌ Не удалось загрузить одно из фото. Отправьте альбом снова."
 
 ISSUE_CREATED = (
-    "✅ Задача {key} (https://tracker.yandex.ru/{key}) успешно создана!\n"
-    "<b>Наименование:</b> {title}"
+    "✅ Задача {issue_key} (https://tracker.yandex.ru/{issue_key}) успешно создана!\n"
+    "<b>Наименование:</b> {summary}"
 )
 ISSUE_CREATION_ERROR = "❌ Ошибка при создании задачи. Попробуйте позже."
 
@@ -41,12 +41,12 @@ ISSUES_LIST = "📂 Ваши задачи:"
 TELEGRAM_ERROR = "⚠️ Ошибка связи с Telegram. Попробуйте ещё раз."
 
 WEBHOOK_COMMENT = (
-    "💬 Добавлен комментарий - <a href='https://tracker.yandex.ru/{issue_key}'>{issue_summary}</a>\n\n"
+    "💬 Добавлен комментарий - <a href='https://tracker.yandex.ru/{issue_key}'>{summary}</a>\n\n"
     "<blockquote>{text}</blockquote>\n\n"
     "<b>👤 Автор комментария:</b> {author}"
 )
 WEBHOOK_STATUS = (
-    "🔄 Статус задачи - <a href='https://tracker.yandex.ru/{issue_key}'>{issue_summary}</a> изменен...\n\n"
+    "🔄 Статус задачи - <a href='https://tracker.yandex.ru/{issue_key}'>{summary}</a> изменен...\n\n"
     "<b>📊 Новый статус:</b> {status_name}\n"
     "<b>👤 Кто изменил:</b> {changed_by}"
 )
