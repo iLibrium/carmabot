@@ -200,9 +200,9 @@ def register_handlers(application):
     application.add_handler(registration_conv)
 
     # --- INLINE-КНОПКИ ---
-    application.add_handler(CallbackQueryHandler(main_menu, pattern="^main_menu$"))
-    application.add_handler(CallbackQueryHandler(show_user_info, pattern="^user_info$"))
+    application.add_handler(CallbackQueryHandler(main_menu, pattern="^main_menu$"), group=1)
+    application.add_handler(CallbackQueryHandler(show_user_info, pattern="^user_info$"), group=1)
 
     # --- (ОСТАЛЬНОЕ ОСТАВИТЬ для совместимости) ---
-    application.add_handler(MessageHandler(filters.Regex("^🔄 Главное меню$"), main_menu))
-    application.add_handler(MessageHandler(filters.Regex("^👤 Моя информация$"), show_user_info))
+    application.add_handler(MessageHandler(filters.Regex("^🔄 Главное меню$"), main_menu), group=1)
+    application.add_handler(MessageHandler(filters.Regex("^👤 Моя информация$"), show_user_info), group=1)
