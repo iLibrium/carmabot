@@ -367,7 +367,15 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
     if not allowed:
         return IssueStates.waiting_for_attachment
     await query.answer()
-
+    # Hide the inline keyboard of the confirmation message so users can't press
+    # it multiple times.
+    try:
+        result = query.edit_message_reply_markup(reply_markup=None)
+        if asyncio.iscoroutine(result):
+            await result
+    except TelegramError as exc:
+        logging.warning("confirm_issue_creation: failed to clear markup: %s", exc)
+    
     db: Database = context.bot_data["db"]
     tracker: TrackerAPI = context.bot_data["tracker"]
     user = update.effective_user
@@ -406,7 +414,11 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
             context=context,
         )
     else:
-        await safe_reply_text(query.message, ISSUE_CREATION_ERROR, context=context)
+        await safe_reply_text(
+            query.message,
+            ISSUE_CREATION_ERROR,
+            context=context,
+        )
         logging.error("failed to create issue for %s", user.id)
 
     context.user_data.clear()

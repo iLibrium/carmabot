@@ -52,6 +52,9 @@ async def check_rate_limit(update: Update, context: CallbackContext, key: str, a
 # Универсальная функция для вывода главного меню с reply-кнопками
 async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("show_main_reply_menu triggered by %s", update.effective_user.id)
+    # Allow immediate re-opening of the create issue flow after returning to the
+    # main menu by clearing the rate-limit timestamp.
+    context.user_data.pop("_start_issue_ts", None)
     if update.callback_query:
         await update.callback_query.answer()
         await safe_reply_text(
