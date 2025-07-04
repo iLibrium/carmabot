@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from telegram import Update, Message
 from telegram.ext import ContextTypes
 from telegram.ext import CallbackContext, ConversationHandler
@@ -19,6 +20,7 @@ from messages import (
     REQUEST_CONTACT,
     NOT_REGISTERED,
     REGISTRATION_SUCCESS,
+    REQUEST_PENDING,
 )
 
 from database import Database
@@ -27,6 +29,25 @@ from keyboards import (
     contact_keyboard,
     register_keyboard,
 )
+
+
+async def check_rate_limit(update: Update, context: CallbackContext, key: str, action: str) -> bool:
+    """Return True if action is allowed, otherwise send alert and return False."""
+    now = time.time()
+    user_data = getattr(context, "user_data", None)
+    if not isinstance(user_data, dict):
+        context.user_data = {}
+        user_data = context.user_data
+    last = user_data.get(key)
+    if last and now - last < 10:
+        if update.callback_query:
+            await update.callback_query.answer(
+                text=REQUEST_PENDING.format(action=action),
+                show_alert=True,
+            )
+        return False
+    user_data[key] = now
+    return True
 
 # Универсальная функция для вывода главного меню с reply-кнопками
 async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -76,6 +97,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_user_info(update, context):
     logging.info("show_user_info for %s", update.effective_user.id)
+    if update.callback_query:
+        allowed = await check_rate_limit(update, context, "_user_info_ts", "получение информации")
+        if not allowed:
+            return
     db = context.bot_data["db"]
     user_id = update.effective_user.id
     user_info = await db.get_user(user_id)
@@ -126,6 +151,10 @@ async def process_contact(update: Update, context: CallbackContext):
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отображает главное меню с reply-кнопками."""
     logging.info("main_menu requested by %s", update.effective_user.id)
+    if update.callback_query:
+        allowed = await check_rate_limit(update, context, "_main_menu_ts", "открытие меню")
+        if not allowed:
+            return
     if update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.edit_message_reply_markup(reply_markup=None)
