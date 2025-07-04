@@ -2,6 +2,7 @@
 
 import logging
 import time
+from telegram.error import BadRequest
 
 SEND_LOG = []
 
@@ -35,6 +36,11 @@ async def safe_delete_message(message):
     """Удаляет сообщение, игнорируя ошибки."""
     try:
         await message.delete()
+    except BadRequest as exc:
+        if str(exc) == "Message to delete not found":
+            logging.warning("[safe_delete_message] message already deleted")
+        else:
+            logging.exception("[safe_delete_message] %s", exc)
     except Exception as exc:
         logging.exception("[safe_delete_message] %s", exc)
 
