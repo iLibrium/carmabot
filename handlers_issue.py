@@ -56,7 +56,7 @@ from messages import (
     NOT_REGISTERED,
     REQUEST_PENDING,
 )
-from handlers_common import check_rate_limit
+from handlers_common import check_rate_limit, show_main_reply_menu
 
 # ──────────────────────────── буфер медиа‑альбомов ─────────────────────────────
 
@@ -531,6 +531,7 @@ def register_handlers(app):
     async def do_nothing(update, context):
         if update.callback_query:
             await update.callback_query.answer()
+        await show_main_reply_menu(update, context)
         return ConversationHandler.END
 
     conv = ConversationHandler(
