@@ -56,6 +56,7 @@ from messages import (
     NOT_REGISTERED,
     REQUEST_PENDING,
 )
+from handlers_common import check_rate_limit
 
 # ──────────────────────────── буфер медиа‑альбомов ─────────────────────────────
 
@@ -69,6 +70,10 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     Функция работает и для inline-кнопок, и для текстовой команды.
     """
     logging.info("my_issues requested by %s", update.effective_user.id)
+    if update.callback_query:
+        allowed = await check_rate_limit(update, context, "_my_issues_ts", "получение списка задач")
+        if not allowed:
+            return
     # Сбрасываем временные данные, если пользователь прервал создание задачи
     context.user_data.clear()
     telegram_id = update.effective_user.id
@@ -131,6 +136,10 @@ from telegram.ext import ContextTypes
 async def start_create_issue(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Шаг 0 FSM: предлагаем ввести заголовок (работает с inline-кнопками и командами)."""
     logging.info("start_create_issue by %s", update.effective_user.id)
+    if update.callback_query:
+        allowed = await check_rate_limit(update, context, "_start_issue_ts", "создание задачи")
+        if not allowed:
+            return ConversationHandler.END
     db: Database = context.bot_data["db"]
     if not await db.get_user(update.effective_user.id):
         if update.callback_query:
@@ -354,16 +363,9 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
     """Создаёт задачу в Tracker и сохраняет её в БД."""
     logging.info("confirm_issue_creation by %s", update.effective_user.id)
     query = update.callback_query
-
-    now = time.time()
-    last_time = context.user_data.get("_create_issue_ts")
-    if last_time and now - last_time < 10:
-        await query.answer(
-            text=REQUEST_PENDING.format(action="создание задачи"),
-            show_alert=True,
-        )
+    allowed = await check_rate_limit(update, context, "_create_issue_ts", "создание задачи")
+    if not allowed:
         return IssueStates.waiting_for_attachment
-    context.user_data["_create_issue_ts"] = now
     await query.answer()
 
     db: Database = context.bot_data["db"]
@@ -426,16 +428,9 @@ async def select_issue_for_comment(update: Update, context: CallbackContext):
         )
         return ConversationHandler.END
     query = update.callback_query
-
-    now = time.time()
-    last_time = context.user_data.get("_comment_request_ts")
-    if last_time and now - last_time < 10:
-        await query.answer(
-            text=REQUEST_PENDING.format(action="добавление комментария"),
-            show_alert=True,
-        )
+    allowed = await check_rate_limit(update, context, "_comment_request_ts", "добавление комментария")
+    if not allowed:
         return ConversationHandler.END
-    context.user_data["_comment_request_ts"] = now
 
     issue_key = query.data.split("_", 1)[1]
     context.user_data["issue_key"] = issue_key
