@@ -169,12 +169,25 @@ class TrackerAPI:
             issues = await resp.json()
 
         # Фильтруем закрытые, отменённые и завершённые задачи вручную
-        filtered = [
-            issue
-            for issue in issues
-            if issue.get("status", {}).get("key") not in {"closed", "canceled", "done"}
-            and issue.get("status", {}).get("name") not in {"Завершено", "Отменено"}
-        ]
+        filtered = []
+        for issue in issues:
+            status = issue.get("status") or {}
+            if isinstance(status, dict):
+                key = str(status.get("key", "")).lower()
+                name = str(status.get("name", "")).lower()
+            else:
+                key = str(status).lower()
+                name = ""
+
+            skip = False
+            if any(w in key for w in ("closed", "canceled", "cancelled", "done")):
+                skip = True
+            if any(substr in name for substr in ("заверш", "отмен")):
+                skip = True
+
+            if not skip:
+                filtered.append(issue)
+
         return filtered
 
     async def add_comment(
