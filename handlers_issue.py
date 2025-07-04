@@ -369,7 +369,7 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
     if issue and "key" in issue:
         await db.create_issue(user.id, issue["key"])
         logging.info("issue %s created for %s", issue['key'], user.id)
-        text = ISSUE_CREATED.format(key=issue['key'], title=html.escape(title))
+        text = ISSUE_CREATED.format(issue_key=issue['key'], summary=html.escape(title))
         await safe_reply_text(
             query.message,
             text,

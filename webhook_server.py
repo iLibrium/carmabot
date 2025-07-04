@@ -99,7 +99,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         comment_data = data.get("comment", {})
         issue_key = issue.get("key")
         comment_id = comment_data.get("id")
-        issue_summary = issue.get("summary", "Нет темы")
+        summary = issue.get("summary", "Нет темы")
 
         prune_processed_ids()
 
@@ -185,7 +185,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
         clean_text = sanitize_comment_text(comment_data.get("text", ""))
         message_text = WEBHOOK_COMMENT.format(
             issue_key=issue_key,
-            issue_summary=issue_summary,
+            summary=summary,
             text=clean_text,
             author=comment_author,
         )
@@ -291,7 +291,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
 
         issue = data.get("issue") or {}
         issue_key = issue.get("key")
-        issue_summary = issue.get("summary", "Нет темы")
+        summary = issue.get("summary", "Нет темы")
         telegram_id = issue.get("telegramId")
 
         changed_by = data.get("changedBy") or data.get("updatedBy") or {}
@@ -321,7 +321,7 @@ def setup_webhook_routes(app, application: Application, tracker: TrackerAPI):
 
         message_text = WEBHOOK_STATUS.format(
             issue_key=issue_key,
-            issue_summary=issue_summary,
+            summary=summary,
             status_name=status_name,
             changed_by=changed_by,
         )
