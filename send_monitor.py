@@ -3,6 +3,7 @@
 import logging
 import time
 from telegram.error import BadRequest
+import asyncio
 
 SEND_LOG = []
 
@@ -43,5 +44,25 @@ async def safe_delete_message(message):
             logging.exception("[safe_delete_message] %s", exc)
     except Exception as exc:
         logging.exception("[safe_delete_message] %s", exc)
+
+async def safe_edit_message_reply_markup(obj, *args, **kwargs):
+    """Edit message reply markup and ignore missing-message errors."""
+    try:
+        result = obj.edit_message_reply_markup(*args, **kwargs)
+        if asyncio.iscoroutine(result):
+            await result
+    except BadRequest as exc:
+        if str(exc) == "Message to edit not found":
+            logging.warning(
+                "[safe_edit_message_reply_markup] message already deleted"
+            )
+        else:
+            logging.exception(
+                "[safe_edit_message_reply_markup] %s", exc
+            )
+    except Exception as exc:
+        logging.exception(
+            "[safe_edit_message_reply_markup] %s", exc
+        )
 
 # Дополнительно можешь сделать так для send_photo, edit_message и т.д., если надо отслеживать и их.
