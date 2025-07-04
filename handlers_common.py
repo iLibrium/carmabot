@@ -109,26 +109,28 @@ async def show_user_info(update, context):
     user_id = update.effective_user.id
     user_info = await db.get_user(user_id)
     if not user_info:
-        await safe_reply_text(
-            update.message,
+        target = update.message or update.callback_query.message
+        msg = await target.reply_text(
             NOT_REGISTERED,
             reply_markup=register_keyboard(),
-            context=context,
         )
+        if context.user_data is not None:
+            context.user_data["last_bot_message"] = msg
         return
 
     full_name = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
     phone = user_info.get("phone_number", "Нет данных")
 
-    await safe_reply_text(
-        update.message,
+    target = update.message or update.callback_query.message
+    msg = await target.reply_text(
         f"👤 <b>Ваши данные:</b>\n"
         f"Имя: {full_name}\n"
         f"Телефон: {phone}\n"
         f"Telegram: @{update.effective_user.username or 'Нет'}",
         parse_mode="HTML",
-        context=context,
     )
+    if context.user_data is not None:
+        context.user_data["last_bot_message"] = msg
     await safe_delete_message(update.message)
 
 # ─────────────────── обработка контакта (регистрация) ────────────────────
