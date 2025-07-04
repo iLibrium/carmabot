@@ -10,6 +10,7 @@ from send_monitor import (
     safe_send_message,
     safe_reply_text,
     safe_delete_message,
+    safe_edit_message_reply_markup,
 )
 from telegram.ext import (
     CommandHandler, MessageHandler, CallbackQueryHandler, ConversationHandler, filters
@@ -160,7 +161,9 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_reply_markup(reply_markup=None)
+        await safe_edit_message_reply_markup(
+            update.callback_query, reply_markup=None
+        )
         msg = context.user_data.pop("issues_list_message", None)
         if msg:
             await safe_delete_message(msg)
