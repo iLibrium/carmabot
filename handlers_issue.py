@@ -155,10 +155,24 @@ async def start_create_issue(update: Update, context: ContextTypes.DEFAULT_TYPE)
     ])
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text(
-            ENTER_ISSUE_TITLE,
-            reply_markup=markup
-        )
+        try:
+            await update.callback_query.edit_message_text(
+                ENTER_ISSUE_TITLE,
+                reply_markup=markup
+            )
+        except TelegramError as exc:
+            logging.warning(
+                "start_create_issue edit failed for %s: %s",
+                update.effective_user.id,
+                exc,
+            )
+            await safe_send_message(
+                context.bot,
+                chat_id=update.effective_chat.id,
+                text=ENTER_ISSUE_TITLE,
+                reply_markup=markup,
+                context=context,
+            )
     elif update.message:
         await safe_reply_text(
             update.message,

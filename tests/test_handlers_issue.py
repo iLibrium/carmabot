@@ -19,6 +19,7 @@ from handlers_issue import (
 from messages import NOT_REGISTERED, FILE_TOO_LARGE
 from states import IssueStates
 from telegram.ext import ConversationHandler
+from telegram.error import BadRequest
 from config import Config
 
 @pytest.mark.asyncio
@@ -209,7 +210,7 @@ async def test_process_comment_passes_filename(monkeypatch):
     tracker.get_issue_details = AsyncMock(return_value={"summary": "s"})
 
     db = MagicMock()
-    db.get_user = AsyncMock(return_value={})
+    db.get_user = AsyncMock(return_value={"id": 1})
 
     context = MagicMock()
     context.bot = bot
@@ -294,7 +295,7 @@ async def test_my_issues_clears_user_data(monkeypatch):
     context = MagicMock()
     context.user_data = {"tmp": "data"}
     db = MagicMock()
-    db.get_user = AsyncMock(return_value={})
+    db.get_user = AsyncMock(return_value={"id": 1})
     tracker = MagicMock()
     tracker.get_active_issues_by_telegram_id = AsyncMock(return_value=[])
     context.bot_data = {"db": db, "tracker": tracker}
@@ -333,3 +334,29 @@ async def test_start_create_issue_unregistered(monkeypatch):
     sys.modules["handlers_issue"].safe_reply_text.assert_awaited_once_with(
         cbq.message, NOT_REGISTERED, reply_markup=ANY, context=context
     )
+
+
+@pytest.mark.asyncio
+async def test_start_create_issue_edit_missing(monkeypatch):
+    update = MagicMock()
+    cbq = MagicMock()
+    cbq.answer = AsyncMock()
+    cbq.edit_message_text = AsyncMock(side_effect=BadRequest("fail"))
+    update.callback_query = cbq
+    update.message = None
+    update.effective_user = MagicMock(id=1)
+    update.effective_chat = MagicMock(id=1)
+
+    context = MagicMock()
+    db = MagicMock()
+    db.get_user = AsyncMock(return_value={"id": 1})
+    context.bot_data = {"db": db}
+    context.bot = MagicMock()
+
+    send_mock = AsyncMock()
+    monkeypatch.setattr(sys.modules["handlers_issue"], "safe_send_message", send_mock)
+
+    result = await start_create_issue(update, context)
+
+    assert result == IssueStates.waiting_for_title
+    send_mock.assert_awaited_once()
