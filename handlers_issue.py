@@ -46,6 +46,7 @@ from messages import (
     TELEGRAM_DOWNLOAD_FAILED,
     FILE_UPLOAD_FAILED,
     ALBUM_FILE_FAILED,
+    FILE_TOO_LARGE,
     ISSUE_CREATED,
     ISSUE_CREATION_ERROR,
     COMMENT_PROMPT,
@@ -73,14 +74,18 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not await db.get_user(telegram_id):
         if update.callback_query:
             await update.callback_query.answer()
-            await update.callback_query.message.reply_text(
+            await safe_reply_text(
+                update.callback_query.message,
                 NOT_REGISTERED,
                 reply_markup=register_keyboard(),
+                context=context,
             )
         elif update.message:
-            await update.message.reply_text(
+            await safe_reply_text(
+                update.message,
                 NOT_REGISTERED,
                 reply_markup=register_keyboard(),
+                context=context,
             )
             await safe_delete_message(update.message)
         return
@@ -101,7 +106,7 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.callback_query.answer()
             await update.callback_query.edit_message_text(NO_ISSUES, reply_markup=markup)
         elif update.message:
-            await update.message.reply_text(NO_ISSUES, reply_markup=markup)
+            await safe_reply_text(update.message, NO_ISSUES, reply_markup=markup, context=context)
         if update.message:
             await safe_delete_message(update.message)
         return
@@ -111,7 +116,7 @@ async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.callback_query.edit_message_text(ISSUES_LIST, reply_markup=markup)
         context.user_data["issues_list_message"] = update.callback_query.message
     elif update.message:
-        sent = await update.message.reply_text(ISSUES_LIST, reply_markup=markup)
+        sent = await safe_reply_text(update.message, ISSUES_LIST, reply_markup=markup, context=context)
         context.user_data["issues_list_message"] = sent
     if update.message:
         await safe_delete_message(update.message)
@@ -128,14 +133,18 @@ async def start_create_issue(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not await db.get_user(update.effective_user.id):
         if update.callback_query:
             await update.callback_query.answer()
-            await update.callback_query.message.reply_text(
+            await safe_reply_text(
+                update.callback_query.message,
                 NOT_REGISTERED,
                 reply_markup=register_keyboard(),
+                context=context,
             )
         elif update.message:
-            await update.message.reply_text(
+            await safe_reply_text(
+                update.message,
                 NOT_REGISTERED,
                 reply_markup=register_keyboard(),
+                context=context,
             )
             await safe_delete_message(update.message)
         return ConversationHandler.END
@@ -149,9 +158,11 @@ async def start_create_issue(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=markup
         )
     elif update.message:
-        await update.message.reply_text(
+        await safe_reply_text(
+            update.message,
             ENTER_ISSUE_TITLE,
-            reply_markup=markup
+            reply_markup=markup,
+            context=context,
         )
         await safe_delete_message(update.message)
     return IssueStates.waiting_for_title
@@ -163,13 +174,13 @@ async def process_issue_title(update: Update, context: CallbackContext):
     logging.info("process_issue_title from %s: %s", update.effective_user.id, update.message.text)
     title = update.message.text.strip()
     if not title:
-        await safe_reply_text(update.message, TITLE_EMPTY)
+        await safe_reply_text(update.message, TITLE_EMPTY, context=context)
         return IssueStates.waiting_for_title
 
     context.user_data["issue_title"] = title
     await safe_reply_text(update.message, ENTER_ISSUE_DESCRIPTION,
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")]])
-    )
+    , context=context)
     return IssueStates.waiting_for_description
 
 # ─────────────────────────── описание задачи ─────────────────────────────────
@@ -194,7 +205,7 @@ async def ask_for_attachments(update: Update, context: CallbackContext):
             [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
             [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")],
         ])
-    )
+    , context=context)
     context.user_data["attachments"] = []  # обнуляем список
     return IssueStates.waiting_for_attachment
 
@@ -208,7 +219,10 @@ async def handle_attachment(update: Update, context: CallbackContext):
 
     file = update.message.photo[-1] if update.message.photo else update.message.document
     if not file:
-        await safe_reply_text(update.message, UNSUPPORTED_FILE)
+        await safe_reply_text(update.message, UNSUPPORTED_FILE, context=context)
+        return IssueStates.waiting_for_attachment
+    if getattr(file, "file_size", 0) > Config.MAX_FILE_SIZE:
+        await safe_reply_text(update.message, FILE_TOO_LARGE, context=context)
         return IssueStates.waiting_for_attachment
 
     try:
@@ -234,14 +248,15 @@ async def handle_attachment(update: Update, context: CallbackContext):
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
                 [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")],
-            ])
+            ]),
+            context=context,
         )
 
     except TelegramError:
-        await safe_reply_text(update.message, TELEGRAM_DOWNLOAD_FAILED)
+        await safe_reply_text(update.message, TELEGRAM_DOWNLOAD_FAILED, context=context)
     except Exception as exc:
         logging.exception("Ошибка загрузки вложения: %s", exc)
-        await safe_reply_text(update.message, FILE_UPLOAD_FAILED)
+        await safe_reply_text(update.message, FILE_UPLOAD_FAILED, context=context)
 
     return IssueStates.waiting_for_attachment
 
@@ -277,6 +292,15 @@ async def _process_album_later(group_id: str, context: CallbackContext):
         if not file:
             continue
         try:
+            if getattr(file, "file_size", 0) > Config.MAX_FILE_SIZE:
+                await safe_send_message(
+                    context.bot,
+                    chat_id=chat_id,
+                    text=FILE_TOO_LARGE,
+                    context=context,
+                )
+                return
+
             file_info = await context.bot.get_file(file.file_id)
             if getattr(file, "file_name", None):
                 ext = os.path.splitext(file.file_name)[1] or ".jpg"
@@ -291,19 +315,21 @@ async def _process_album_later(group_id: str, context: CallbackContext):
                 attachments.append(file_id)
         except Exception as exc:
             logging.exception("Ошибка загрузки из альбома: %s", exc)
-            await safe_send_message(context.bot, chat_id=chat_id, text=ALBUM_FILE_FAILED)
+            await safe_send_message(context.bot, chat_id=chat_id, text=ALBUM_FILE_FAILED, context=context)
             return  # прерываем весь альбом
 
     # складываем ID вложений в user_data
     context.user_data["attachments"] = context.user_data.get("attachments", []) + attachments
 
-    await context.bot.send_message(
+    await safe_send_message(
+        context.bot,
         chat_id=chat_id,
         text=FILES_UPLOADED.format(count=len(attachments)),
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
             [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")],
-        ])
+        ]),
+        context=context,
     )
 
 # ─────────────────────────── финальное подтверждение ─────────────────────────
@@ -344,13 +370,15 @@ async def confirm_issue_creation(update: Update, context: CallbackContext):
         await db.create_issue(user.id, issue["key"])
         logging.info("issue %s created for %s", issue['key'], user.id)
         text = ISSUE_CREATED.format(key=issue['key'], title=html.escape(title))
-        await query.message.reply_text(
+        await safe_reply_text(
+            query.message,
             text,
             parse_mode="HTML",
-            reply_markup=main_reply_keyboard(),  # показываем reply‑меню
+            reply_markup=main_reply_keyboard(),
+            context=context,
         )
     else:
-        await query.message.reply_text(ISSUE_CREATION_ERROR)
+        await safe_reply_text(query.message, ISSUE_CREATION_ERROR, context=context)
         logging.error("failed to create issue for %s", user.id)
 
     context.user_data.clear()
@@ -364,9 +392,11 @@ async def select_issue_for_comment(update: Update, context: CallbackContext):
     db: Database = context.bot_data["db"]
     if not await db.get_user(update.effective_user.id):
         await update.callback_query.answer()
-        await update.callback_query.message.reply_text(
+        await safe_reply_text(
+            update.callback_query.message,
             NOT_REGISTERED,
             reply_markup=register_keyboard(),
+            context=context,
         )
         return ConversationHandler.END
     query = update.callback_query
@@ -375,11 +405,13 @@ async def select_issue_for_comment(update: Update, context: CallbackContext):
     msg = context.user_data.pop("issues_list_message", None)
     if msg:
         await safe_delete_message(msg)
-    await query.message.reply_text(
+    await safe_reply_text(
+        query.message,
         COMMENT_PROMPT,
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("🔄 Главное меню", callback_data="main_menu")]]
         ),
+        context=context,
     )
     return IssueStates.waiting_for_comment
 
@@ -389,7 +421,7 @@ async def process_comment(update: Update, context: CallbackContext):
     tracker: TrackerAPI = context.bot_data["tracker"]
     issue_key: str | None = context.user_data.get("issue_key")
     if not issue_key:
-        await safe_reply_text(update.message, NO_ISSUE_SELECTED)
+        await safe_reply_text(update.message, NO_ISSUE_SELECTED, context=context)
         return ConversationHandler.END
 
     db: Database = context.bot_data["db"]
@@ -400,6 +432,9 @@ async def process_comment(update: Update, context: CallbackContext):
     # Если в сообщении есть файл — загружаем
     if update.message.photo or update.message.document:
         file = update.message.document or update.message.photo[-1]
+        if getattr(file, "file_size", 0) > Config.MAX_FILE_SIZE:
+            await safe_reply_text(update.message, FILE_TOO_LARGE, context=context)
+            return IssueStates.waiting_for_comment
         try:
             file_info = await context.bot.get_file(file.file_id)
             if getattr(file, "file_name", None):
@@ -415,7 +450,7 @@ async def process_comment(update: Update, context: CallbackContext):
                 attachment_ids.append(file_id)
         except Exception as exc:
             logging.exception("Ошибка загрузки файла комментария: %s", exc)
-            await safe_reply_text(update.message, FILE_UPLOAD_FAILED)
+            await safe_reply_text(update.message, FILE_UPLOAD_FAILED, context=context)
             return IssueStates.waiting_for_comment
 
     user = update.effective_user
@@ -438,6 +473,7 @@ async def process_comment(update: Update, context: CallbackContext):
         COMMENT_ADDED.format(issue_key=issue_key, summary=summary),
         parse_mode="HTML",
         reply_markup=main_reply_keyboard(),
+        context=context,
     )
     context.user_data.clear()
     return ConversationHandler.END
@@ -468,9 +504,7 @@ def register_handlers(app):
                 MessageHandler(filters.TEXT & (~filters.COMMAND), process_issue_description),
             ],
             IssueStates.waiting_for_attachment: [
-                MessageHandler(filters.PHOTO, handle_photo_or_album),
-                MessageHandler(filters.Document.IMAGE, handle_photo_or_album),
-                MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_attachment),
+                MessageHandler(filters.PHOTO | filters.Document.ALL, handle_photo_or_album),
                 CallbackQueryHandler(confirm_issue_creation, pattern="^create_issue$")
             ],
             IssueStates.waiting_for_comment: [
@@ -490,6 +524,5 @@ def register_handlers(app):
     app.add_handler(CallbackQueryHandler(my_issues, pattern="^my_issues$"))
 
     # Общие ловцы альбомов и вложений (если нужны вне FSM)
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo_or_album))
-    app.add_handler(MessageHandler(filters.Document.IMAGE, handle_photo_or_album))
+    app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_photo_or_album))
 

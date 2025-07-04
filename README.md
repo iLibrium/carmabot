@@ -55,7 +55,8 @@ Send each file to `/v2/attachments` and pass the returned IDs in the
 When receiving webhooks the bot downloads attachments by calling
 `/v2/issues/{key}/comments/{id}?expand=attachments`.
 Images up to 10&nbsp;MB are sent using `sendPhoto`. Larger files or images that
-Telegram fails to process are delivered with `sendDocument`.
+Telegram fails to process are delivered with `sendDocument`. Files larger than
+50&nbsp;MB are rejected.
 
 Example payload for the webhook endpoint:
 

@@ -27,6 +27,9 @@ class Config:
     PRODUCT_CUSTOM_FIELD = "67c0879c407b93717eac01e6--product"
     PRODUCT_DEFAULT = ["CRM"]
 
+    # Maximum allowed file size for uploads (50 MB)
+    MAX_FILE_SIZE = 50 * 1024 * 1024
+
     
     # PostgreSQL
     DB_USER = os.getenv('DB_USER')

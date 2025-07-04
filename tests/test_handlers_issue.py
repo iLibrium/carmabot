@@ -16,12 +16,13 @@ from handlers_issue import (
     start_create_issue,
     _album_buffer,
 )
-from messages import NOT_REGISTERED
+from messages import NOT_REGISTERED, FILE_TOO_LARGE
+from states import IssueStates
 from telegram.ext import ConversationHandler
 from config import Config
 
 @pytest.mark.asyncio
-async def test_confirm_issue_creation_extra_fields():
+async def test_confirm_issue_creation_extra_fields(monkeypatch):
     update = MagicMock()
     user = MagicMock()
     user.id = 1
@@ -32,7 +33,7 @@ async def test_confirm_issue_creation_extra_fields():
 
     query = MagicMock()
     query.answer = AsyncMock()
-    query.message.reply_text = AsyncMock()
+    monkeypatch.setattr(sys.modules["handlers_issue"], "safe_reply_text", AsyncMock())
     update.callback_query = query
 
     context = MagicMock()
@@ -68,6 +69,7 @@ async def test_handle_attachment_document_extension(monkeypatch):
     document.file_unique_id = "uid"
     document.file_id = "fid"
     document.file_name = "file.pdf"
+    document.file_size = 123
     message.document = document
     message.photo = []
     message.reply_text = AsyncMock()
@@ -101,12 +103,44 @@ async def test_handle_attachment_document_extension(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_handle_attachment_too_large(monkeypatch):
+    update = MagicMock()
+    message = MagicMock()
+    update.message = message
+    update.effective_user = MagicMock(id=1)
+
+    document = MagicMock()
+    document.file_unique_id = "uid"
+    document.file_id = "fid"
+    document.file_size = Config.MAX_FILE_SIZE + 1
+    message.document = document
+    message.photo = []
+    message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.bot = MagicMock()
+    context.user_data = {}
+
+    monkeypatch.setattr(
+        sys.modules["handlers_issue"], "safe_reply_text", AsyncMock()
+    )
+
+    state = await handle_attachment(update, context)
+
+    sys.modules["handlers_issue"].safe_reply_text.assert_awaited_once_with(
+        message, FILE_TOO_LARGE, context=context
+    )
+    assert state == IssueStates.waiting_for_attachment
+
+
+@pytest.mark.asyncio
 async def test_process_album_later_passes_filename(monkeypatch):
     msg = MagicMock()
     file = MagicMock()
     file.file_unique_id = "uid"
     file.file_id = "fid"
     file.file_name = "orig.jpg"
+    file.file_size = 123
     msg.photo = []
     msg.document = file
     msg.chat_id = 1
@@ -122,6 +156,7 @@ async def test_process_album_later_passes_filename(monkeypatch):
     bot = MagicMock()
     bot.get_file = AsyncMock(return_value=file_info)
     bot.send_message = AsyncMock()
+    monkeypatch.setattr(sys.modules["handlers_issue"], "safe_send_message", AsyncMock())
 
     tracker = MagicMock()
     tracker.upload_file = AsyncMock(return_value=1)
@@ -152,6 +187,7 @@ async def test_process_comment_passes_filename(monkeypatch):
     doc.file_unique_id = "uid"
     doc.file_id = "fid"
     doc.file_name = "doc.txt"
+    doc.file_size = 123
     message.document = doc
     message.photo = []
     message.text = None
@@ -193,12 +229,45 @@ async def test_process_comment_passes_filename(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_my_issues_unregistered():
+async def test_process_comment_too_large(monkeypatch):
+    update = MagicMock()
+    message = MagicMock()
+    update.message = message
+    update.effective_user = MagicMock(id=1, first_name="A", last_name="B", username="u")
+
+    doc = MagicMock()
+    doc.file_unique_id = "uid"
+    doc.file_id = "fid"
+    doc.file_size = Config.MAX_FILE_SIZE + 1
+    message.document = doc
+    message.photo = []
+    message.text = None
+    message.caption = None
+
+    context = MagicMock()
+    context.bot = MagicMock()
+    context.bot_data = {"tracker": MagicMock(), "db": MagicMock()}
+    context.user_data = {"issue_key": "ISSUE-1"}
+
+    monkeypatch.setattr(
+        sys.modules["handlers_issue"], "safe_reply_text", AsyncMock()
+    )
+
+    state = await process_comment(update, context)
+
+    sys.modules["handlers_issue"].safe_reply_text.assert_awaited_once_with(
+        message, FILE_TOO_LARGE, context=context
+    )
+    assert state == IssueStates.waiting_for_comment
+
+
+@pytest.mark.asyncio
+async def test_my_issues_unregistered(monkeypatch):
     update = MagicMock()
     update.effective_user = MagicMock(id=1)
     cbq = MagicMock()
     cbq.answer = AsyncMock()
-    cbq.message.reply_text = AsyncMock()
+    monkeypatch.setattr(sys.modules["handlers_issue"], "safe_reply_text", AsyncMock())
     update.callback_query = cbq
 
     context = MagicMock()
@@ -208,8 +277,8 @@ async def test_my_issues_unregistered():
 
     await my_issues(update, context)
 
-    cbq.message.reply_text.assert_called_once_with(
-        NOT_REGISTERED, reply_markup=ANY
+    sys.modules["handlers_issue"].safe_reply_text.assert_awaited_once_with(
+        cbq.message, NOT_REGISTERED, reply_markup=ANY, context=context
     )
 
 
@@ -220,7 +289,7 @@ async def test_my_issues_clears_user_data(monkeypatch):
     update.message = msg
     update.callback_query = None
     update.effective_user = MagicMock(id=1)
-    msg.reply_text = AsyncMock()
+    monkeypatch.setattr(sys.modules["handlers_issue"], "safe_reply_text", AsyncMock())
 
     context = MagicMock()
     context.user_data = {"tmp": "data"}
@@ -238,18 +307,20 @@ async def test_my_issues_clears_user_data(monkeypatch):
     await my_issues(update, context)
 
     assert context.user_data == {}
-    msg.reply_text.assert_called_once()
+    sys.modules["handlers_issue"].safe_reply_text.assert_awaited_once_with(
+        msg, ANY, reply_markup=ANY, context=context
+    )
     delete_mock.assert_called_once_with(msg)
 
 
 @pytest.mark.asyncio
-async def test_start_create_issue_unregistered():
+async def test_start_create_issue_unregistered(monkeypatch):
     update = MagicMock()
     update.effective_user = MagicMock(id=1)
     cbq = MagicMock()
     cbq.answer = AsyncMock()
-    cbq.message.reply_text = AsyncMock()
     update.callback_query = cbq
+    monkeypatch.setattr(sys.modules["handlers_issue"], "safe_reply_text", AsyncMock())
 
     context = MagicMock()
     db = MagicMock()
@@ -259,6 +330,6 @@ async def test_start_create_issue_unregistered():
     result = await start_create_issue(update, context)
 
     assert result == ConversationHandler.END
-    cbq.message.reply_text.assert_called_once_with(
-        NOT_REGISTERED, reply_markup=ANY
+    sys.modules["handlers_issue"].safe_reply_text.assert_awaited_once_with(
+        cbq.message, NOT_REGISTERED, reply_markup=ANY, context=context
     )
