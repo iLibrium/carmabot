@@ -5,11 +5,15 @@ Carmabot is a Telegram bot integrated with Yandex Tracker. It uses FastAPI for w
 ## Installation
 
 1. Create and activate a virtual environment.
-2. Install dependencies:
+2. Install dependencies (HTTP/2 support is enabled by default):
 
 ```bash
 pip install -r requirements.txt
 ```
+
+The requirements include `python-telegram-bot[asyncio,http2]` to enable HTTP/2
+for Telegram API calls. Set the environment variable `TELEGRAM_HTTP2=0` before
+running the bot if you prefer not to install the `http2` extras.
 
 ## Configuration
 
@@ -22,7 +26,7 @@ The bot is configured via environment variables. You can place them in a `.env` 
 | `TELEGRAM_KEEPALIVE` | Keep-alive pool size for Telegram requests |
 | `TELEGRAM_READ_TIMEOUT` | Read timeout for Telegram requests |
 | `TELEGRAM_CONNECT_TIMEOUT` | Connect timeout for Telegram requests |
-| `TELEGRAM_HTTP2` | Enable HTTP/2 for Telegram API (`1`/`0`) |
+| `TELEGRAM_HTTP2` | Enable HTTP/2 for Telegram API (`1`/`0`). Requires the `http2` extras of `python-telegram-bot` |
 | `TRACKER_TOKEN` | Yandex Tracker API token |
 | `TRACKER_ORG_ID` | Tracker organization ID |
 | `TRACKER_QUEUE` | Default Tracker queue |
