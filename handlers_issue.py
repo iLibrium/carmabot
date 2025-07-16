@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import tempfile
 import html
 import time
 from collections import defaultdict
@@ -71,11 +72,25 @@ async def upload_file(file, bot, tracker):
         ext = os.path.splitext(file.file_name)[1] or ".jpg"
     else:
         ext = ".jpg"
-    filename = f"{file.file_unique_id}{ext}"
-    temp_path = os.path.join("/tmp", filename)
+    # Some albums may contain the same file multiple times which means
+    # ``file_unique_id`` would be identical for each message.  In such
+    # cases concurrent downloads would try to use the same path in ``/tmp``
+    # leading to race conditions when deleting the temporary file.  Use a
+    # unique filename instead of ``file_unique_id`` to avoid collisions.
+    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+        temp_path = tmp.name
+
     await file_info.download_to_drive(temp_path)
-    file_id = await tracker.upload_file(temp_path, getattr(file, "file_name", None))
-    os.remove(temp_path)
+    try:
+        file_id = await tracker.upload_file(
+            temp_path, getattr(file, "file_name", None)
+        )
+    finally:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            logging.warning("Failed to remove temporary file %s", temp_path)
+
     return file_id
 
 # ═══════════════════════════ список задач ═════════════════════════════════════
