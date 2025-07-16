@@ -18,6 +18,11 @@ The bot is configured via environment variables. You can place them in a `.env` 
 | Variable | Description |
 |----------|-------------|
 | `BOT_TOKEN` | Telegram bot token |
+| `TELEGRAM_POOL_SIZE` | Number of HTTP connections for Telegram API |
+| `TELEGRAM_KEEPALIVE` | Keep-alive pool size for Telegram requests |
+| `TELEGRAM_READ_TIMEOUT` | Read timeout for Telegram requests |
+| `TELEGRAM_CONNECT_TIMEOUT` | Connect timeout for Telegram requests |
+| `TELEGRAM_HTTP2` | Enable HTTP/2 for Telegram API (`1`/`0`) |
 | `TRACKER_TOKEN` | Yandex Tracker API token |
 | `TRACKER_ORG_ID` | Tracker organization ID |
 | `TRACKER_QUEUE` | Default Tracker queue |

@@ -77,12 +77,14 @@ async def main() -> None:
         .token(BOT_TOKEN)
         .request(
             HTTPXRequest(
-                connection_pool_size=20,
-                read_timeout=60,
-                connect_timeout=30,
+                connection_pool_size=Config.TELEGRAM_POOL_SIZE,
+                read_timeout=Config.TELEGRAM_READ_TIMEOUT,
+                connect_timeout=Config.TELEGRAM_CONNECT_TIMEOUT,
+                http_version="2" if Config.TELEGRAM_HTTP2 else "1.1",
                 httpx_kwargs={
                     "limits": Limits(
-                        max_connections=20, max_keepalive_connections=10
+                        max_connections=Config.TELEGRAM_POOL_SIZE,
+                        max_keepalive_connections=Config.TELEGRAM_KEEPALIVE,
                     )
                 },
             )
