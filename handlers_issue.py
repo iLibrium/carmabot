@@ -62,6 +62,22 @@ from handlers_common import check_rate_limit, show_main_reply_menu
 
 _album_buffer: Dict[str, List[Message]] = defaultdict(list)  # media_group_id -> [Message]
 
+
+async def upload_file(file, bot, tracker):
+    """Download a Telegram *file* and upload it to Tracker."""
+
+    file_info = await bot.get_file(file.file_id)
+    if getattr(file, "file_name", None):
+        ext = os.path.splitext(file.file_name)[1] or ".jpg"
+    else:
+        ext = ".jpg"
+    filename = f"{file.file_unique_id}{ext}"
+    temp_path = os.path.join("/tmp", filename)
+    await file_info.download_to_drive(temp_path)
+    file_id = await tracker.upload_file(temp_path, getattr(file, "file_name", None))
+    os.remove(temp_path)
+    return file_id
+
 # ═══════════════════════════ список задач ═════════════════════════════════════
 
 async def my_issues(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -251,29 +267,22 @@ async def handle_attachment(update: Update, context: CallbackContext):
         return IssueStates.waiting_for_attachment
 
     try:
-        file_info = await context.bot.get_file(file.file_id)
-        if getattr(file, "file_name", None):
-            ext = os.path.splitext(file.file_name)[1] or ".jpg"
-        else:
-            ext = ".jpg"
-        filename = f"{file.file_unique_id}{ext}"
-        temp_path = os.path.join("/tmp", filename)
-
-        await file_info.download_to_drive(temp_path)
-        file_id = await tracker.upload_file(temp_path, getattr(file, "file_name", None))
-        os.remove(temp_path)
-
+        file_id = await upload_file(file, context.bot, tracker)
         if not file_id:
             raise RuntimeError("upload_file вернул None")
 
         attachments.append(file_id)
         context.user_data["attachments"] = attachments
 
-        await safe_reply_text(update.message, FILES_UPLOADED.format(count=len(attachments)),
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
-                [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")],
-            ]),
+        await safe_reply_text(
+            update.message,
+            FILES_UPLOADED.format(count=len(attachments)),
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("📤 Создать задачу", callback_data="create_issue")],
+                    [InlineKeyboardButton("🔄 Отмена", callback_data="main_menu")],
+                ]
+            ),
             context=context,
         )
 
@@ -312,36 +321,30 @@ async def _process_album_later(group_id: str, context: CallbackContext):
     attachments: List[int] = []
     chat_id = messages[0].chat_id
 
+    files = []
     for msg in messages:
         file = msg.photo[-1] if msg.photo else msg.document
         if not file:
             continue
-        try:
-            if getattr(file, "file_size", 0) > Config.MAX_FILE_SIZE:
-                await safe_send_message(
-                    context.bot,
-                    chat_id=chat_id,
-                    text=FILE_TOO_LARGE,
-                    context=context,
-                )
-                return
+        if getattr(file, "file_size", 0) > Config.MAX_FILE_SIZE:
+            await safe_send_message(
+                context.bot,
+                chat_id=chat_id,
+                text=FILE_TOO_LARGE,
+                context=context,
+            )
+            return
+        files.append(file)
 
-            file_info = await context.bot.get_file(file.file_id)
-            if getattr(file, "file_name", None):
-                ext = os.path.splitext(file.file_name)[1] or ".jpg"
-            else:
-                ext = ".jpg"
-            filename = f"{file.file_unique_id}{ext}"
-            temp_path = os.path.join("/tmp", filename)
-            await file_info.download_to_drive(temp_path)
-            file_id = await tracker.upload_file(temp_path, getattr(file, "file_name", None))
-            os.remove(temp_path)
-            if file_id:
-                attachments.append(file_id)
-        except Exception as exc:
-            logging.exception("Ошибка загрузки из альбома: %s", exc)
-            await safe_send_message(context.bot, chat_id=chat_id, text=ALBUM_FILE_FAILED, context=context)
-            return  # прерываем весь альбом
+    try:
+        results = await asyncio.gather(
+            *(upload_file(f, context.bot, tracker) for f in files)
+        )
+        attachments.extend([r for r in results if r])
+    except Exception as exc:
+        logging.exception("Ошибка загрузки из альбома: %s", exc)
+        await safe_send_message(context.bot, chat_id=chat_id, text=ALBUM_FILE_FAILED, context=context)
+        return  # прерываем весь альбом
 
     # складываем ID вложений в user_data
     context.user_data["attachments"] = context.user_data.get("attachments", []) + attachments
@@ -480,16 +483,10 @@ async def process_comment(update: Update, context: CallbackContext):
             await safe_reply_text(update.message, FILE_TOO_LARGE, context=context)
             return IssueStates.waiting_for_comment
         try:
-            file_info = await context.bot.get_file(file.file_id)
-            if getattr(file, "file_name", None):
-                ext = os.path.splitext(file.file_name)[1] or ".jpg"
-            else:
-                ext = ".jpg"
-            filename = f"{file.file_unique_id}{ext}"
-            temp_path = os.path.join("/tmp", filename)
-            await file_info.download_to_drive(temp_path)
-            file_id = await tracker.upload_file(temp_path, getattr(file, "file_name", None))
-            os.remove(temp_path)
+            results = await asyncio.gather(
+                upload_file(file, context.bot, tracker)
+            )
+            file_id = results[0]
             if file_id:
                 attachment_ids.append(file_id)
         except Exception as exc:
