@@ -6,6 +6,11 @@ load_dotenv(override=True)
 class Config:
     # Telegram
     BOT_TOKEN = os.getenv('BOT_TOKEN')
+    TELEGRAM_POOL_SIZE = int(os.getenv('TELEGRAM_POOL_SIZE', 40))
+    TELEGRAM_KEEPALIVE = int(os.getenv('TELEGRAM_KEEPALIVE', TELEGRAM_POOL_SIZE // 2))
+    TELEGRAM_READ_TIMEOUT = float(os.getenv('TELEGRAM_READ_TIMEOUT', 60))
+    TELEGRAM_CONNECT_TIMEOUT = float(os.getenv('TELEGRAM_CONNECT_TIMEOUT', 30))
+    TELEGRAM_HTTP2 = os.getenv('TELEGRAM_HTTP2', '1') not in ('0', 'false', 'False')
     
     # Yandex Tracker
     TRACKER_TOKEN = os.getenv('TRACKER_TOKEN')
