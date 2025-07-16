@@ -6,6 +6,13 @@ from telegram.error import BadRequest
 import asyncio
 
 SEND_LOG = []
+_pending_delete_tasks: set[asyncio.Task] = set()
+
+async def wait_pending_deletes():
+    """Wait for all scheduled message deletions to finish."""
+    if not _pending_delete_tasks:
+        return
+    await asyncio.gather(*_pending_delete_tasks, return_exceptions=True)
 
 async def safe_send_message(bot, *args, context=None, **kwargs):
     SEND_LOG.append(time.time())
@@ -14,7 +21,11 @@ async def safe_send_message(bot, *args, context=None, **kwargs):
     logging.info(f"[safe_send_message] called at {SEND_LOG[-1]} | total in last 5 sec: {len(recent)} | chat_id: {kwargs.get('chat_id', 'unknown')}")
     user_data = getattr(context, "user_data", None) if context else None
     if user_data and user_data.get("last_bot_message"):
-        await safe_delete_message(user_data.pop("last_bot_message"))
+        task = asyncio.create_task(
+            safe_delete_message(user_data.pop("last_bot_message"))
+        )
+        _pending_delete_tasks.add(task)
+        task.add_done_callback(_pending_delete_tasks.discard)
     msg = await bot.send_message(*args, **kwargs)
     if user_data is not None:
         user_data["last_bot_message"] = msg
@@ -27,7 +38,11 @@ async def safe_reply_text(message, *args, context=None, **kwargs):
     logging.info(f"[safe_reply_text] called at {SEND_LOG[-1]} | total in last 5 sec: {len(recent)} | chat_id: {getattr(message, 'chat_id', 'unknown')}")
     user_data = getattr(context, "user_data", None) if context else None
     if user_data and user_data.get("last_bot_message"):
-        await safe_delete_message(user_data.pop("last_bot_message"))
+        task = asyncio.create_task(
+            safe_delete_message(user_data.pop("last_bot_message"))
+        )
+        _pending_delete_tasks.add(task)
+        task.add_done_callback(_pending_delete_tasks.discard)
     msg = await message.reply_text(*args, **kwargs)
     if user_data is not None:
         user_data["last_bot_message"] = msg

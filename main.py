@@ -18,6 +18,7 @@ import contextlib
 
 
 from config import Config
+from send_monitor import wait_pending_deletes
 from database import Database
 from tracker_client import TrackerAPI
 from webhook_server import setup_webhook_routes
@@ -147,6 +148,7 @@ async def main() -> None:
             with contextlib.suppress(Exception, asyncio.CancelledError, KeyboardInterrupt):
                 await server_task
             logging.info("✅ FastAPI сервер остановлен")
+        await wait_pending_deletes()
         await tracker.close()
         await db.close()
         logging.info("✅ Завершение работы: ресурсы освобождены")
