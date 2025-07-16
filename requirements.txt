@@ -1,4 +1,4 @@
-python-telegram-bot[asyncio]
+python-telegram-bot[asyncio,http2]
 fastapi
 aiohttp
 asyncpg
