@@ -16,6 +16,7 @@ class Config:
     TRACKER_TOKEN = os.getenv('TRACKER_TOKEN')
     TRACKER_ORG_ID = os.getenv('TRACKER_ORG_ID')
     TRACKER_QUEUE = os.getenv('TRACKER_QUEUE')  # Добавлено
+    TRACKER_POOL_LIMIT = int(os.getenv('TRACKER_POOL_LIMIT', 20))
 
     API_TOKEN = os.getenv('API_TOKEN')  # Добавлено
 

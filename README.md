@@ -30,6 +30,7 @@ The bot is configured via environment variables. You can place them in a `.env` 
 | `TRACKER_TOKEN` | Yandex Tracker API token |
 | `TRACKER_ORG_ID` | Tracker organization ID |
 | `TRACKER_QUEUE` | Default Tracker queue |
+| `TRACKER_POOL_LIMIT` | HTTP connection limit for Tracker API |
 | `API_TOKEN` | Token used to authorize incoming webhooks |
 | `DB_USER` | PostgreSQL user name |
 | `DB_PASSWORD` | PostgreSQL user password |

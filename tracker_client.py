@@ -3,6 +3,7 @@ import os
 import asyncio
 import aiohttp
 import mimetypes
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,9 @@ class TrackerAPI:
         if session is None or session.closed:
             timeout = aiohttp.ClientTimeout(total=60)
             if self._connector is None or self._connector.closed:
-                self._connector = aiohttp.TCPConnector(limit=20)
+                self._connector = aiohttp.TCPConnector(
+                    limit=Config.TRACKER_POOL_LIMIT
+                )
             session = aiohttp.ClientSession(timeout=timeout, connector=self._connector)
             self._sessions[loop] = session
         return session
