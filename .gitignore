@@ -9,3 +9,4 @@ __pycache__/
 git.txt
 db_test.py
 /.vscode
+.pytest_cache/
