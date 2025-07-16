@@ -77,3 +77,7 @@ Example payload for the webhook endpoint:
 }
 ```
 
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
