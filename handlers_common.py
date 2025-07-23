@@ -30,6 +30,7 @@ from keyboards import (
     contact_keyboard,
     register_keyboard,
 )
+from n8n_client import n8n_forward_message
 
 
 async def check_rate_limit(update: Update, context: CallbackContext, key: str, action: str) -> bool:
@@ -188,6 +189,17 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context=context,
         )
 
+
+async def forward_message_to_n8n(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Forward plain text messages to the n8n webhook."""
+    if not update.message or not update.message.text:
+        return
+    token = context.bot.token
+    try:
+        await n8n_forward_message(token, update.message.text)
+    except Exception as exc:
+        logging.error("Failed to forward message to n8n: %s", exc)
+
 def register_handlers(application):
     registration_conv = ConversationHandler(
         entry_points=[
@@ -211,3 +223,7 @@ def register_handlers(application):
     # --- (ОСТАЛЬНОЕ ОСТАВИТЬ для совместимости) ---
     application.add_handler(MessageHandler(filters.Regex("^🔄 Главное меню$"), main_menu), group=1)
     application.add_handler(MessageHandler(filters.Regex("^👤 Моя информация$"), show_user_info), group=1)
+    application.add_handler(
+        MessageHandler(filters.TEXT & (~filters.COMMAND), forward_message_to_n8n),
+        group=100,
+    )
