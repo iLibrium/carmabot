@@ -62,3 +62,24 @@ async def test_start_registration_button(monkeypatch):
     result = await start(update, context)
 
     assert result == RegistrationStates.waiting_for_contact
+
+
+@pytest.mark.asyncio
+async def test_forward_message_to_n8n(monkeypatch):
+    update = MagicMock()
+    message = MagicMock()
+    message.text = "hello"
+    update.message = message
+    update.effective_user = MagicMock(id=1)
+
+    context = MagicMock()
+    context.bot = MagicMock(token="TOKEN")
+
+    forward_mock = AsyncMock()
+    monkeypatch.setattr("handlers_common.n8n_forward_message", forward_mock)
+
+    from handlers_common import forward_message_to_n8n
+
+    await forward_message_to_n8n(update, context)
+
+    forward_mock.assert_awaited_once_with("TOKEN", "hello")
