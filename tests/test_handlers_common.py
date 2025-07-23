@@ -75,6 +75,7 @@ async def test_forward_message_to_n8n(monkeypatch):
 
     context = MagicMock()
     context.bot = MagicMock(token="TOKEN")
+    context.chat_data = {}
 
     forward_mock = AsyncMock()
     monkeypatch.setattr("handlers_common.n8n_forward_message", forward_mock)
@@ -83,4 +84,10 @@ async def test_forward_message_to_n8n(monkeypatch):
 
     await forward_message_to_n8n(update, context)
 
-    forward_mock.assert_awaited_once_with("hello", 1, 42)
+    forward_mock.assert_awaited_once()
+    args, _ = forward_mock.call_args
+    assert args[0] == "hello"
+    assert args[1] == 1
+    assert args[2] == 42
+    session_id = args[3]
+    assert context.chat_data["session_id"] == session_id
