@@ -22,12 +22,12 @@ async def n8n_create_issue(title, description, telegram_id, attachments=None):
             return await resp.json()
 
 
-async def n8n_forward_message(token: str, message: str):
+async def n8n_forward_message(message: str, user_id: int, chat_id: int):
     """Send a user message to the configured n8n webhook."""
     if not N8N_MESSAGE_WEBHOOK_URL:
         raise RuntimeError("N8N_MESSAGE_WEBHOOK_URL not configured")
 
-    payload = {"token": token, "message": message}
+    payload = {"message": message, "userid": user_id, "chatid": chat_id}
     async with aiohttp.ClientSession() as session:
         async with session.post(N8N_MESSAGE_WEBHOOK_URL, json=payload) as resp:
             if resp.status != 200:

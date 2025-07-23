@@ -194,9 +194,12 @@ async def forward_message_to_n8n(update: Update, context: ContextTypes.DEFAULT_T
     """Forward plain text messages to the n8n webhook."""
     if not update.message or not update.message.text:
         return
-    token = context.bot.token
     try:
-        await n8n_forward_message(token, update.message.text)
+        await n8n_forward_message(
+            update.message.text,
+            update.effective_user.id,
+            update.message.chat_id,
+        )
     except Exception as exc:
         logging.error("Failed to forward message to n8n: %s", exc)
 
