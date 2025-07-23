@@ -128,6 +128,8 @@ async def main() -> None:
     try:
         await application.initialize()
         await application.start()
+        # Remove any previously set webhook so polling works
+        await application.bot.delete_webhook(drop_pending_updates=True)
         await application.updater.start_polling()
         logging.info("✅ Бот запущен и ожидает события")
 
