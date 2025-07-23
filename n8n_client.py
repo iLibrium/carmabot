@@ -4,7 +4,7 @@ import os
 N8N_BASE_URL = os.getenv("N8N_BASE_URL")  # например, http://localhost:5678
 N8N_MESSAGE_WEBHOOK_URL = os.getenv(
     "N8N_MESSAGE_WEBHOOK_URL",
-    "http://n8n.mxmit.ru:5678/webhook-test/15ce4d64-adee-4522-8591-8463573d0bc6/webhook",
+    "https://n8n.mxmit.ru/webhook-test/e6827a5f-d5d6-4d90-af48-d39186ea03e5",
 )
 
 async def n8n_create_issue(title, description, telegram_id, attachments=None):
