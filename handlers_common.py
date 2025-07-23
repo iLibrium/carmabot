@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import secrets
 from telegram import Update, Message
 from telegram.ext import ContextTypes
 from telegram.ext import CallbackContext, ConversationHandler
@@ -32,6 +33,24 @@ from keyboards import (
 )
 from n8n_client import n8n_forward_message
 
+# ──────────────────────── session management ──────────────────────────
+SESSION_TIMEOUT = 15 * 60  # seconds
+
+def start_chat_session(chat_data: dict) -> str:
+    """Return existing session id or create a new one."""
+    now = time.time()
+    session_id = chat_data.get("session_id")
+    last = chat_data.get("session_ts")
+    if not session_id or (last and now - last > SESSION_TIMEOUT):
+        session_id = secrets.token_hex(8)
+        chat_data["session_id"] = session_id
+    chat_data["session_ts"] = now
+    return session_id
+
+def end_chat_session(chat_data: dict) -> None:
+    chat_data.pop("session_id", None)
+    chat_data.pop("session_ts", None)
+
 
 async def check_rate_limit(update: Update, context: CallbackContext, key: str, action: str) -> bool:
     """Return True if action is allowed, otherwise send alert and return False."""
@@ -54,6 +73,7 @@ async def check_rate_limit(update: Update, context: CallbackContext, key: str, a
 # Универсальная функция для вывода главного меню с reply-кнопками
 async def show_main_reply_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("show_main_reply_menu triggered by %s", update.effective_user.id)
+    end_chat_session(context.chat_data)
     # Allow immediate re-opening of the create issue flow after returning to the
     # main menu by clearing the rate-limit timestamp.
     context.user_data.pop("_start_issue_ts", None)
@@ -194,11 +214,13 @@ async def forward_message_to_n8n(update: Update, context: ContextTypes.DEFAULT_T
     """Forward plain text messages to the n8n webhook."""
     if not update.message or not update.message.text:
         return
+    session_id = start_chat_session(context.chat_data)
     try:
         await n8n_forward_message(
             update.message.text,
             update.effective_user.id,
             update.message.chat_id,
+            session_id,
         )
     except Exception as exc:
         logging.error("Failed to forward message to n8n: %s", exc)
