@@ -320,6 +320,7 @@ async def handle_photo_or_album(update: Update, context: CallbackContext):  # no
         # запускаем отложенную обработку альбома только при первом фото
         if len(_album_buffer[gid]) == 1:
             asyncio.create_task(_process_album_later(gid, context))
+        return IssueStates.waiting_for_attachment
     else:
         # одиночное фото/документ
         return await handle_attachment(update, context)
